@@ -230,7 +230,8 @@ class MealAgent:
         has_profile_constraints = bool(
             session.profile_ids and (
                 session.constraints.allergens or session.constraints.taboo_keys
-                or session.constraints.health_needs or session.constraints.taste_pref))
+                or session.constraints.health_needs or session.constraints.taste_pref)
+        ) or bool(session.constraints.extra_banned)  # 用户资料忌口/会话忌口同样构成约束方向
         if slots.ambiguous and not has_profile_constraints and not session.current_plan:
             session.add_history("user", message)
             q = slots.clarify_question or "方便说说您的偏好吗？比如想吃辣的还是清淡的、几个人吃？"

@@ -34,6 +34,52 @@ class ProfileReq(BaseModel):
     phone: str | None = None
     old_password: str | None = None
     new_password: str | None = None
+    # 个人信息（首次登录引导填写）
+    gender: str | None = None                        # 男/女/保密
+    birthday: str | None = None                      # YYYY-MM-DD，推算年龄须 0-100
+    taboo: list[str] | None = None                   # 忌口多选，空列表=无
+    height_cm: int | None = None                     # 0-250
+    weight_kg: int | None = None                     # 0-300
+
+
+TABOO_OPTIONS = ["海鲜", "虾", "蟹", "鱼", "花生", "坚果", "牛奶", "鸡蛋",
+                 "豆制品", "芒果", "酒精", "辣", "香菜", "内脏"]
+
+def _validate_profile_fields(req: ProfileReq) -> dict:
+    """校验并转换个人信息字段，返回可写入的 fields 片段。"""
+    import datetime as _dt
+    fields: dict = {}
+    if req.gender is not None:
+        if req.gender not in ("男", "女", "保密"):
+            raise HTTPException(400, "性别只能是 男 / 女 / 保密")
+        fields["gender"] = req.gender
+    if req.birthday is not None:
+        if req.birthday == "":
+            fields["birthday"] = None
+        else:
+            try:
+                d = _dt.date.fromisoformat(req.birthday)
+            except ValueError:
+                raise HTTPException(400, "生日格式应为 YYYY-MM-DD")
+            today = _dt.date.today()
+            age = today.year - d.year - ((today.month, today.day) < (d.month, d.day))
+            if not (0 <= age <= 100):
+                raise HTTPException(400, f"由生日推算的年龄须在 0-100 之间（当前 {age}）")
+            fields["birthday"] = d
+    if req.taboo is not None:
+        bad = [t for t in req.taboo if t not in TABOO_OPTIONS]
+        if bad:
+            raise HTTPException(400, f"忌口包含非法项：{bad}（可选：{'、'.join(TABOO_OPTIONS)}）")
+        fields["taboo"] = "、".join(req.taboo) if req.taboo else None
+    if req.height_cm is not None:
+        if not (0 < req.height_cm <= 250):
+            raise HTTPException(400, "身高须在 1-250 cm 之间")
+        fields["height_cm"] = req.height_cm
+    if req.weight_kg is not None:
+        if not (0 < req.weight_kg <= 300):
+            raise HTTPException(400, "体重须在 1-300 kg 之间")
+        fields["weight_kg"] = req.weight_kg
+    return fields
 
 
 def _validate_profile(pid: int | None) -> int | None:
@@ -68,7 +114,9 @@ async def login(req: LoginReq):
 
 @router.get("/me")
 async def me(user: dict = Depends(security.current_user)):
-    return db.user_public(user)
+    data = db.user_public(user)
+    data["taboo_options"] = TABOO_OPTIONS
+    return data
 
 
 @router.put("/profile")
@@ -81,6 +129,7 @@ async def update_profile(req: ProfileReq, user: dict = Depends(security.current_
         fields["health_profile_id"] = _validate_profile(req.health_profile_id)
     if req.phone is not None:
         fields["phone"] = req.phone.strip()[:32] or None
+    fields.update(_validate_profile_fields(req))
     if req.new_password:
         if not req.old_password or not security.verify_password(req.old_password, user["password_hash"]):
             raise HTTPException(400, "原密码不正确")

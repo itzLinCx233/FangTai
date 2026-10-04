@@ -17,7 +17,7 @@ from datetime import datetime
 from typing import Any, Optional
 
 from sqlalchemy import (
-    BigInteger, Boolean, DateTime, ForeignKey, Index, Integer, String, Text,
+    BigInteger, Boolean, Date, DateTime, ForeignKey, Index, Integer, String, Text,
     create_engine, func, select, text, update,
 )
 from sqlalchemy.engine import Engine
@@ -43,6 +43,12 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(16), nullable=False, default="user")
     health_profile_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     phone: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    # 个人信息（注册后首次登录引导填写；未填为 NULL，前端显示为 保密/无）
+    gender: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)          # 男/女/保密
+    birthday: Mapped[Optional[datetime]] = mapped_column(Date, nullable=True)        # 出生日期（推算年龄 0-100）
+    taboo: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)         # 忌口（逗号分隔，空=NULL 即"无"）
+    height_cm: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)         # 身高 cm（可空=保密）
+    weight_kg: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)         # 体重 kg（可空=保密）
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now(),
@@ -158,8 +164,16 @@ def init_db() -> bool:
                     f"CREATE DATABASE IF NOT EXISTS `{config.MYSQL_DATABASE}` "
                     "DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
             server.close()
-            # 2) 建表（幂等；已有库结构不变）
-            Base.metadata.create_all(_get_engine())
+            # 2) schema 版本化迁移（空库跑全部；已 stamp 的旧库增量升级）
+            try:
+                from alembic.config import Config
+                from alembic import command
+                cfg = Config(str(config.BASE_DIR / "alembic.ini"))
+                cfg.set_main_option("script_location", str(config.BASE_DIR / "alembic"))
+                command.upgrade(cfg, "head")
+            except Exception as mig_err:
+                print(f"[db] alembic 迁移失败，回退 create_all: {mig_err}")
+                Base.metadata.create_all(_get_engine())
             # 3) 管理员（已存在则跳过）
             with _session() as s:
                 admin = s.execute(select(User).where(User.username == config.ADMIN_USERNAME)).scalar_one_or_none()
@@ -171,8 +185,6 @@ def init_db() -> bool:
                     print(f"[db] 已创建管理员账户 {config.ADMIN_USERNAME}")
                 else:
                     print(f"[db] 管理员账户 {config.ADMIN_USERNAME} 已存在，跳过创建")
-            # 4) Alembic stamp（首次标记当前版本，后续用 alembic upgrade 演进）
-            _alembic_stamp_head()
             _db_ready = True
             print(f"[db] MySQL 就绪(SQLAlchemy): {config.MYSQL_HOST}:{config.MYSQL_PORT}/{config.MYSQL_DATABASE}")
             return True
@@ -182,30 +194,14 @@ def init_db() -> bool:
             return False
 
 
-def _alembic_stamp_head():
-    """程序化 stamp：数据库未纳入版本管理时标记为 head。失败仅告警不阻断。"""
-    try:
-        from alembic.config import Config
-        from alembic import command
-        alembic_cfg = Config(str(config.BASE_DIR / "alembic.ini"))
-        alembic_cfg.set_main_option("script_location", str(config.BASE_DIR / "alembic"))
-        with _get_engine().connect() as conn:
-            has_table = conn.execute(text(
-                "SELECT COUNT(*) FROM information_schema.tables "
-                "WHERE table_schema=:d AND table_name='alembic_version'"),
-                {"d": config.MYSQL_DATABASE}).scalar()
-        if not has_table:
-            command.stamp(alembic_cfg, "head")
-    except Exception as e:
-        print(f"[db] alembic stamp 跳过: {e}")
-
-
 # ---------------------------------------------------------------- 用户 DAO
 def _user_dict(u: User) -> dict:
     return {
         "id": u.id, "username": u.username, "nickname": u.nickname,
         "role": u.role, "health_profile_id": u.health_profile_id,
         "phone": u.phone, "is_active": bool(u.is_active),
+        "gender": u.gender, "birthday": str(u.birthday) if u.birthday else None,
+        "taboo": u.taboo, "height_cm": u.height_cm, "weight_kg": u.weight_kg,
         "created_at": str(u.created_at or ""), "last_login_at": str(u.last_login_at or ""),
         "password_hash": u.password_hash,
     }
@@ -255,7 +251,8 @@ def authenticate(username: str, password: str) -> Optional[dict]:
 
 
 def update_user(uid: int, fields: dict) -> bool:
-    allow = {"nickname", "role", "health_profile_id", "phone", "is_active", "password_hash"}
+    allow = {"nickname", "role", "health_profile_id", "phone", "is_active", "password_hash",
+             "gender", "birthday", "taboo", "height_cm", "weight_kg"}
     vals = {k: v for k, v in fields.items() if k in allow}
     if not vals:
         return False

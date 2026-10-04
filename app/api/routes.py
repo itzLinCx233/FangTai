@@ -35,6 +35,17 @@ def _optional_user(authorization: str | None) -> dict | None:
     return None
 
 
+def _apply_user_taboo(sess: dlg.DialogSession, user: dict | None):
+    """把用户资料里的忌口并入会话约束（会话内幂等）。"""
+    if not user or not user.get("taboo"):
+        return
+    have = set(sess.constraints.extra_banned)
+    for t in str(user["taboo"]).split("、"):
+        t = t.strip()
+        if t and t not in have:
+            sess.constraints.add_banned([t])
+
+
 def _merged_profile_ids(req_profile_ids: list[int], user: dict | None) -> list[int]:
     """登录用户：其绑定档案 + 请求携带的同餐人档案（去重）。匿名：仅请求档案。"""
     ids: list[int] = []
@@ -83,6 +94,7 @@ async def chat(req: ChatRequest, authorization: str | None = Header(None)):
     user = _optional_user(authorization)
     req.profile_ids = _merged_profile_ids(req.profile_ids, user)
     sess = _get_session(req)
+    _apply_user_taboo(sess, user)
     agent = get_agent()
 
     async def gen():
@@ -118,6 +130,7 @@ async def recommend(req: RecommendRequest, authorization: str | None = Header(No
     user = _optional_user(authorization)
     req.profile_ids = _merged_profile_ids(req.profile_ids, user)
     sess = _get_session(req)
+    _apply_user_taboo(sess, user)
     agent = get_agent()
     events = []
     t0 = time.perf_counter()

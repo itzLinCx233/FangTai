@@ -83,11 +83,37 @@
         <div class="modal-head"><h3>个人中心</h3><button class="close-x" @click="ucMask = false">×</button></div>
         <div class="modal-body" v-if="auth.user">
           <div class="uc-section"><h4>📊 账号信息</h4>
-            <div class="uc-info">用户名：<b>{{ auth.user.username }}</b> ｜ 角色：{{ auth.user.role === 'admin' ? '管理员' : '普通用户' }}<br>
-              注册时间：{{ auth.user.created_at }} ｜ 最后登录：{{ auth.user.last_login_at || '-' }}</div>
+            <div class="uc-info">账号：<b>{{ auth.user.username }}</b> ｜ 角色：{{ auth.user.role === 'admin' ? '管理员' : '普通用户' }}<br>
+              性别：{{ auth.user.gender || '保密' }} ｜ 生日：{{ auth.user.birthday || '保密' }} ｜
+              身高：{{ auth.user.height_cm ? auth.user.height_cm + 'cm' : '保密' }} ｜
+              体重：{{ auth.user.weight_kg ? auth.user.weight_kg + 'kg' : '保密' }}<br>
+              忌口：{{ auth.user.taboo || '无' }} ｜ 注册时间：{{ auth.user.created_at }}</div>
           </div>
           <div class="uc-section"><h4>👤 资料设置</h4>
             <div class="form-item"><label>昵称</label><input v-model="uc.nick"></div>
+            <div class="form-item"><label>性别</label>
+              <div class="radio-row">
+                <label v-for="g in ['男', '女', '保密']" :key="g" class="radio-item">
+                  <input type="radio" :value="g" v-model="uc.gender">{{ g }}
+                </label>
+              </div>
+            </div>
+            <div class="form-item"><label>生日</label>
+              <input type="date" v-model="uc.birthday" max="today-max">
+              <div class="hint">用于推算年龄（0-100 岁）；不填视为保密</div>
+            </div>
+            <div class="form-item"><label>忌口（可多选，不选=无）</label>
+              <div class="check-row">
+                <label v-for="t in tabooOptions" :key="t" class="check-item">
+                  <input type="checkbox" :value="t" v-model="uc.taboo">{{ t }}
+                </label>
+              </div>
+              <div class="hint">推荐时将自动规避所勾选的忌口食材</div>
+            </div>
+            <div class="form-item two-col">
+              <div><label>身高 cm（可选）</label><input type="number" v-model.number="uc.height_cm" min="1" max="250" placeholder="保密"></div>
+              <div><label>体重 kg（可选）</label><input type="number" v-model.number="uc.weight_kg" min="1" max="300" placeholder="保密"></div>
+            </div>
             <div class="form-item"><label>同餐人档案（多人宴请，可多选）</label>
               <select v-model="uc.companions" multiple>
                 <option v-for="p in profiles" :key="p.id" :value="p.id">{{ profileLabel(p) }}</option>
@@ -118,13 +144,53 @@
       </div>
     </div>
   </div>
+
+    <!-- 首次登录：完善个人信息 -->
+    <div class="modal-mask" v-if="obShow">
+      <div class="modal">
+        <div class="modal-head"><h3>完善个人信息</h3></div>
+        <div class="modal-body">
+          <p class="ob-tip">初次见面！简单介绍一下自己，推荐会更懂你（生日与性别用于营养目标测算）</p>
+          <div class="err">{{ obErr }}</div>
+          <div class="form-item">
+            <label>性别 <span class="req">*</span></label>
+            <div class="radio-row">
+              <label v-for="g in ['男', '女', '保密']" :key="g" class="radio-item">
+                <input type="radio" :value="g" v-model="ob.gender">{{ g }}
+              </label>
+            </div>
+          </div>
+          <div class="form-item">
+            <label>生日 <span class="req">*</span></label>
+            <input type="date" v-model="ob.birthday">
+            <div class="hint">年龄须在 0-100 岁之间{{ obAge !== null ? '（当前 ' + obAge + ' 岁）' : '' }}</div>
+          </div>
+          <div class="form-item">
+            <label>忌口（可多选，不选默认无）</label>
+            <div class="check-row">
+              <label v-for="t in tabooOptions" :key="t" class="check-item">
+                <input type="checkbox" :value="t" v-model="ob.taboo">{{ t }}
+              </label>
+            </div>
+          </div>
+          <div class="form-item two-col">
+            <div><label>身高 cm（可选）</label><input type="number" v-model.number="ob.height_cm" min="1" max="250" placeholder="保密"></div>
+            <div><label>体重 kg（可选）</label><input type="number" v-model.number="ob.weight_kg" min="1" max="300" placeholder="保密"></div>
+          </div>
+          <div class="ob-actions">
+            <button class="btn" @click="skipOnboard">暂时跳过</button>
+            <button class="btn primary" :disabled="obLoading" @click="finishOnboard">{{ obLoading ? '保存中…' : '完成' }}</button>
+          </div>
+        </div>
+      </div>
+    </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { api, getToken, profileLabel, type Profile } from '../api'
-import { useAuth } from '../stores/auth'
+import { useAuth, TABOO_OPTIONS } from '../stores/auth'
 
 const router = useRouter()
 const auth = useAuth()
@@ -228,7 +294,8 @@ function goAdmin() { menuOpen.value = false; router.push('/admin') }
 
 /* ---------- 个人中心 ---------- */
 const ucMask = ref(false)
-const uc = ref({ nick: '', companions: [] as number[] })
+const tabooOptions = TABOO_OPTIONS
+const uc = ref({ nick: '', companions: [] as number[], gender: '保密', birthday: '', taboo: [] as string[], height_cm: null as number | null, weight_kg: null as number | null })
 const pw = ref({ old: '', new: '' })
 const ucSessions = ref<any[]>([])
 const sessionView = ref<any[]>([])
@@ -237,6 +304,11 @@ async function openCenter() {
   menuOpen.value = false
   const u = auth.user!
   uc.value.nick = u.nickname || ''
+  uc.value.gender = u.gender || '保密'
+  uc.value.birthday = u.birthday || ''
+  uc.value.taboo = u.taboo ? u.taboo.split('、') : []
+  uc.value.height_cm = u.height_cm || null
+  uc.value.weight_kg = u.weight_kg || null
   uc.value.companions = [...companions.value]
   ucSessions.value = []
   sessionView.value = []
@@ -252,7 +324,14 @@ async function saveProfile() {
   localStorage.setItem('ft_companions', JSON.stringify(companions.value))
   await api('/api/auth/profile', {
     method: 'PUT',
-    body: JSON.stringify({ nickname: uc.value.nick }),
+    body: JSON.stringify({
+      nickname: uc.value.nick,
+      gender: uc.value.gender || '保密',
+      birthday: uc.value.birthday || '',
+      taboo: uc.value.taboo,
+      height_cm: uc.value.height_cm || null,
+      weight_kg: uc.value.weight_kg || null,
+    }),
   })
   await auth.refresh()
   ucMask.value = false
@@ -269,8 +348,72 @@ async function changePassword() {
   } catch (e: any) { alert('修改失败：' + e.message) }
 }
 
+
+/* ---------- 首次登录信息完善 ---------- */
+const obShow = ref(false)
+const obLoading = ref(false)
+const obErr = ref('')
+const ob = ref({ gender: '', birthday: '', taboo: [] as string[], height_cm: null as number | null, weight_kg: null as number | null })
+
+const obAge = computed<number | null>(() => {
+  if (!ob.value.birthday) return null
+  const d = new Date(ob.value.birthday)
+  if (isNaN(d.getTime())) return null
+  const now = new Date()
+  let age = now.getFullYear() - d.getFullYear()
+  const m = now.getMonth() - d.getMonth()
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--
+  return age
+})
+
+function profileIncomplete(): boolean {
+  const u = auth.user
+  return !!u && (!u.gender || !u.birthday)
+}
+
+function maybeShowOnboard() {
+  if (!profileIncomplete()) return
+  if (sessionStorage.getItem('ft_ob_dismissed')) return
+  ob.value = { gender: auth.user!.gender || '', birthday: auth.user!.birthday || '',
+               taboo: auth.user!.taboo ? auth.user!.taboo.split('、') : [],
+               height_cm: auth.user!.height_cm || null, weight_kg: auth.user!.weight_kg || null }
+  obShow.value = true
+}
+
+function skipOnboard() {
+  sessionStorage.setItem('ft_ob_dismissed', '1')
+  obShow.value = false
+}
+
+async function finishOnboard() {
+  obErr.value = ''
+  if (!ob.value.gender) { obErr.value = '请选择性别'; return }
+  if (!ob.value.birthday) { obErr.value = '请填写生日'; return }
+  if (obAge.value === null || obAge.value < 0 || obAge.value > 100) {
+    obErr.value = '由生日推算的年龄须在 0-100 岁之间'; return
+  }
+  obLoading.value = true
+  try {
+    await api('/api/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify({
+        gender: ob.value.gender,
+        birthday: ob.value.birthday,
+        taboo: ob.value.taboo,
+        height_cm: ob.value.height_cm || null,
+        weight_kg: ob.value.weight_kg || null,
+      }),
+    })
+    await auth.refresh()
+    obShow.value = false
+    pushSystem('个人信息已完善' + (ob.value.taboo.length ? '，忌口（' + ob.value.taboo.join('、') + '）将在推荐中自动规避' : ''))
+  } catch (e: any) { obErr.value = e.message }
+  finally { obLoading.value = false }
+}
+
 onMounted(async () => {
-  auth.refresh()
+  await auth.refresh()
+  maybeShowOnboard()
   try {
     const d = await fetch('/api/profiles?kind=simple').then(r => r.json())
     profiles.value = d.items
@@ -361,4 +504,16 @@ textarea:focus { border-color: var(--primary) }
 .cv-msg { margin-bottom: 10px; font-size: 13px; line-height: 1.6 }
 .cv-msg b { color: var(--primary) }
 .muted { color: var(--muted); font-size: 13px }
+
+/* 信息完善/个人中心新样式 */
+.radio-row { display: flex; gap: 18px; flex-wrap: wrap }
+.radio-item, .check-item { display: inline-flex; align-items: center; gap: 5px; font-size: 14px; cursor: pointer; color: var(--text) }
+.radio-item input, .check-item input { accent-color: var(--primary) }
+.check-row { display: flex; flex-wrap: wrap; gap: 10px 16px }
+.two-col { display: flex; gap: 12px }
+.two-col > div { flex: 1 }
+.two-col input { width: 100% }
+.req { color: var(--danger) }
+.ob-tip { font-size: 13px; color: var(--muted); margin-bottom: 14px; line-height: 1.6 }
+.ob-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px }
 </style>

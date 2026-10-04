@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管理后台 · 方太个性化膳食规划 Agent</title>
+<style>
+:root{
+  --sidebar:#1d2b33; --sidebar-hover:#2a3d47; --primary:#0f6f5c; --primary-light:#e6f2ef;
+  --bg:#f4f6f8; --card:#fff; --text:#2a2f36; --muted:#8a929c; --border:#e5e8ec;
+  --danger:#c0483f; --ok:#1a9b7e; --warn:#e8a33d;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh}
+aside{width:210px;background:var(--sidebar);color:#cfd8de;display:flex;flex-direction:column;position:fixed;top:0;bottom:0;left:0}
+aside .brand{padding:20px 18px;border-bottom:1px solid rgba(255,255,255,.08)}
+aside .brand h2{font-size:16px;color:#fff}
+aside .brand p{font-size:11px;color:#7d8f99;margin-top:4px}
+nav{flex:1;padding:12px 10px}
+nav a{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:8px;font-size:14px;cursor:pointer;color:#cfd8de;margin-bottom:4px}
+nav a:hover{background:var(--sidebar-hover);color:#fff}
+nav a.on{background:var(--primary);color:#fff}
+aside .foot{padding:14px 18px;border-top:1px solid rgba(255,255,255,.08);font-size:12px;color:#7d8f99}
+aside .foot a{color:#9fc3b8;cursor:pointer}
+main{flex:1;margin-left:210px;padding:22px 26px}
+.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.topbar h1{font-size:19px}
+.topbar .who{font-size:13px;color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:20px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px}
+.card .num{font-size:26px;font-weight:700;margin-top:6px}
+.card .lbl{font-size:13px;color:var(--muted)}
+.card .ico{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px}
+.panel{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px}
+.panel h3{font-size:15px;margin-bottom:12px}
+.toolbar{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
+.toolbar input[type=text]{flex:1;min-width:200px;max-width:340px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none}
+.toolbar input:focus{border-color:var(--primary)}
+.btn{padding:8px 14px;border:1px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;font-size:13px;color:var(--text)}
+.btn:hover{background:var(--primary-light);border-color:var(--primary)}
+.btn.primary{background:var(--primary);color:#fff;border-color:var(--primary)}
+.btn.primary:hover{background:#0c5c4c}
+.btn.mini{padding:4px 10px;font-size:12px;border-radius:6px}
+.btn.danger{color:var(--danger)}
+.btn.danger:hover{background:#fdeeed;border-color:var(--danger)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{ text-align:left;padding:10px 8px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:10px 8px;border-bottom:1px solid #f0f2f4;vertical-align:middle}
+tr:hover td{background:#fafbfc}
+.tag{display:inline-block;padding:1px 9px;border-radius:10px;font-size:12px}
+.tag.admin{background:#fdf1dd;color:#a06a10}
+.tag.user{background:var(--primary-light);color:var(--primary)}
+.tag.on{background:#e5f5f0;color:var(--ok)}
+.tag.off{background:#fdeeed;color:var(--danger)}
+.pager{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:12px;font-size:13px;color:var(--muted)}
+.pager button{padding:5px 11px;border:1px solid var(--border);background:#fff;border-radius:7px;cursor:pointer;font-size:13px}
+.pager button:disabled{opacity:.4;cursor:not-allowed}
+.empty{padding:30px;text-align:center;color:var(--muted);font-size:13px}
+/* 模态框 */
+.mask{position:fixed;inset:0;background:rgba(20,26,32,.45);display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
+.mask.show{display:flex}
+.modal{background:#fff;border-radius:14px;width:430px;max-width:100%;max-height:88vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.modal.wide{width:620px}
+.mhead{padding:15px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#fff}
+.mhead h3{font-size:15px}
+.x{border:none;background:none;font-size:20px;color:var(--muted);cursor:pointer}
+.mbody{padding:18px 20px}
+.fi{margin-bottom:13px}
+.fi label{display:block;font-size:13px;color:#4a5361;margin-bottom:5px}
+.fi input,.fi select{width:100%;padding:8px 11px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;outline:none;font-family:inherit}
+.fi input:focus,.fi select:focus{border-color:var(--primary)}
+.fi .hint{font-size:12px;color:var(--muted);margin-top:3px}
+.mfoot{padding:13px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px}
+.err{color:var(--danger);font-size:13px;min-height:17px;margin-bottom:6px}
+#gate{max-width:420px;margin:80px auto;background:#fff;border:1px solid var(--border);border-radius:14px;padding:30px;text-align:center}
+#gate h2{margin-bottom:8px}
+#gate p{color:var(--muted);font-size:13px;margin-bottom:16px}
+.chat-view{max-height:340px;overflow:auto;border:1px solid var(--border);border-radius:10px;padding:12px;background:#fbfcfd}
+.cv-msg{margin-bottom:10px;font-size:13px;line-height:1.6}
+.cv-msg b{color:var(--primary)}
+</style>
+</head>
+<body>
+<aside>
+  <div class="brand"><h2>🍲 膳食 Agent</h2><p>管理后台 v1.0</p></div>
+  <nav>
+    <a id="navDash" class="on">📊 仪表盘</a>
+    <a id="navUsers">👥 用户管理</a>
+    <a id="navSessions">🕘 会话记录</a>
+    <a id="navChat">💬 返回聊天页</a>
+  </nav>
+  <div class="foot">登录身份：<span id="whoAmI">-</span><br><a id="logout">退出登录</a> · <a href="/">聊天页 ↗</a></div>
+</aside>
+<main>
+  <div id="gate" style="display:none">
+    <h2>需要管理员登录</h2>
+    <p id="gateMsg">请使用管理员账户登录后访问管理后台</p>
+    <div class="fi" style="text-align:left"><label>用户名</label><input id="gUser" value="admin"></div>
+    <div class="fi" style="text-align:left"><label>密码</label><input id="gPass" type="password"></div>
+    <div class="err" id="gErr"></div>
+    <button class="btn primary" id="gLogin" style="width:100%;padding:10px">登 录</button>
+  </div>
+
+  <div id="console" style="display:none">
+    <div class="topbar"><h1 id="pageTitle">仪表盘</h1><div class="who" id="topWho"></div></div>
+
+    <!-- 仪表盘 -->
+    <section id="viewDash">
+      <div class="cards" id="statCards"></div>
+      <div class="panel">
+        <h3>最新注册用户</h3>
+        <table><thead><tr><th>ID</th><th>用户名</th><th>昵称</th><th>角色</th><th>注册时间</th></tr></thead>
+        <tbody id="recentUsers"></tbody></table>
+      </div>
+    </section>
+
+    <!-- 用户管理 -->
+    <section id="viewUsers" style="display:none">
+      <div class="panel">
+        <div class="toolbar">
+          <input type="text" id="uSearch" placeholder="搜索用户名 / 昵称…">
+          <button class="btn" id="uSearchBtn">搜索</button>
+          <span style="flex:1"></span>
+          <button class="btn primary" id="uAdd">＋ 新增用户</button>
+        </div>
+        <table>
+          <thead><tr><th>ID</th><th>用户名</th><th>昵称</th><th>角色</th><th>绑定档案</th><th>手机号</th><th>状态</th><th>注册时间</th><th>最后登录</th><th style="width:170px">操作</th></tr></thead>
+          <tbody id="userRows"></tbody>
+        </table>
+        <div class="pager" id="userPager"></div>
+      </div>
+    </section>
+
+    <!-- 会话记录 -->
+    <section id="viewSessions" style="display:none">
+      <div class="panel">
+        <div class="toolbar">
+          <input type="text" id="sSearch" placeholder="搜索会话标题 / 用户名…">
+          <button class="btn" id="sSearchBtn">搜索</button>
+        </div>
+        <table>
+          <thead><tr><th>会话ID</th><th>标题</th><th>用户</th><th>消息数</th><th>创建时间</th><th style="width:90px">操作</th></tr></thead>
+          <tbody id="sessRows"></tbody>
+        </table>
+        <div class="pager" id="sessPager"></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<!-- 新增/编辑用户模态框 -->
+<div class="mask" id="userMask">
+  <div class="modal">
+    <div class="mhead"><h3 id="umTitle">新增用户</h3><button class="x" onclick="hideMask('userMask')">×</button></div>
+    <div class="mbody">
+      <div class="err" id="umErr"></div>
+      <div class="fi" id="umUsernameWrap"><label>用户名</label><input id="umUsername" placeholder="3-32位"><div class="hint">创建后不可修改</div></div>
+      <div class="fi" id="umPasswordWrap"><label id="umPasswordLabel">密码</label><input id="umPassword" type="password" placeholder="至少6位"></div>
+      <div class="fi"><label>昵称</label><input id="umNickname"></div>
+      <div class="fi"><label>角色</label><select id="umRole"><option value="user">普通用户</option><option value="admin">管理员</option></select></div>
+      <div class="fi"><label>绑定健康档案</label><select id="umProfile"></select></div>
+      <div class="fi"><label>手机号（可空）</label><input id="umPhone"></div>
+      <div class="fi" id="umActiveWrap" style="display:none"><label>状态</label>
+        <select id="umActive"><option value="1">启用</option><option value="0">禁用</option></select></div>
+    </div>
+    <div class="mfoot"><button class="btn" onclick="hideMask('userMask')">取消</button><button class="btn primary" id="umSave">保存</button></div>
+  </div>
+</div>
+
+<!-- 会话详情 -->
+<div class="mask" id="chatMask">
+  <div class="modal wide">
+    <div class="mhead"><h3 id="cmTitle">会话详情</h3><button class="x" onclick="hideMask('chatMask')">×</button></div>
+    <div class="mbody"><div class="chat-view" id="cmView"></div></div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+let token = localStorage.getItem('ft_token') || '';
+let me = null, profilesCache = [];
+let uPage = 1, sPage = 1;
+
+function hideMask(id){ $('#'+id).classList.remove('show'); }
+function showMask(id){ $('#'+id).classList.add('show'); }
+async function api(path, opts={}){
+  opts.headers = Object.assign({'Content-Type':'application/json'},
+    token ? {'Authorization': 'Bearer ' + token} : {}, opts.headers||{});
+  const r = await fetch(path, opts);
+  if(!r.ok){ let m = r.status+' 错误'; try{ m=(await r.json()).detail||m; }catch(e){} throw new Error(m); }
+  return r.json();
+}
+function esc(s){ return String(s ?? '').replace(/</g,'&lt;'); }
+
+/* ---------------- 初始化 ---------------- */
+async function boot(){
+  try{
+    const d = await fetch('/api/profiles?kind=simple').then(r=>r.json());
+    profilesCache = d.items;
+    const opt = p => `<option value="${p.id}">${p.id}号 ${p['性别']}${p['年龄']}岁${(p['特殊人群']||[]).length?' '+p['特殊人群'].join('/'):''}</option>`;
+    $('#umProfile').innerHTML = '<option value="">未绑定</option>' + d.items.map(opt).join('');
+  }catch(e){}
+  try{
+    me = await api('/api/auth/me');
+    if(me.role !== 'admin') return gate('账户 '+me.username+' 不是管理员');
+    enter();
+  }catch(e){
+    if(token){ token=''; localStorage.removeItem('ft_token'); }
+    gate();
+  }
+}
+function gate(msg){
+  $('#gate').style.display = 'block'; $('#console').style.display = 'none';
+  if(msg) $('#gateMsg').textContent = msg;
+}
+function enter(){
+  $('#gate').style.display = 'none'; $('#console').style.display = 'block';
+  $('#whoAmI').textContent = me.nickname || me.username;
+  $('#topWho').textContent = '管理员：' + (me.nickname || me.username) + '（' + me.username + '）';
+  loadDash(); loadUsers(); loadSessions();
+}
+$('#gLogin').onclick = async () => {
+  try{
+    const d = await api('/api/auth/login', {method:'POST', body: JSON.stringify({
+      username: $('#gUser').value.trim(), password: $('#gPass').value})});
+    if(d.user.role !== 'admin'){ $('#gErr').textContent = '该账户不是管理员'; return; }
+    token = d.token; localStorage.setItem('ft_token', token); me = d.user; enter();
+  }catch(e){ $('#gErr').textContent = e.message; }
+};
+$('#logout').onclick = async () => {
+  token=''; me=null; localStorage.removeItem('ft_token');
+  $('#gPass').value=''; gate();
+};
+
+/* ---------------- 导航 ---------------- */
+const views = {navDash:'viewDash', navUsers:'viewUsers', navSessions:'viewSessions'};
+const titles = {navDash:'仪表盘', navUsers:'用户管理', navSessions:'会话记录'};
+Object.keys(views).forEach(k => $('#'+k).onclick = () => {
+  Object.values(views).forEach(v => $('#'+v).style.display='none');
+  Object.keys(views).forEach(n => $('#'+n).classList.toggle('on', n===k));
+  $('#'+views[k]).style.display='block'; $('#pageTitle').textContent = titles[k];
+});
+$('#navChat').onclick = () => location.href = '/';
+
+/* ---------------- 仪表盘 ---------------- */
+async function loadDash(){
+  try{
+    const s = await api('/api/admin/stats');
+    const conf = [
+      ['👥 用户总数', s.users_total, '#e6f2ef', '#0f6f5c'],
+      ['✨ 今日新增', s.users_today, '#fdf1dd', '#a06a10'],
+      ['💬 会话总数', s.sessions_total, '#eef4ff', '#3f6ac6'],
+      ['✉️ 消息总数', s.messages_total, '#f3e9f7', '#7c4d9e'],
+    ];
+    $('#statCards').innerHTML = conf.map(([l,n,bg,c]) =>
+      `<div class="card"><div class="ico" style="background:${bg};color:${c}">◆</div><div class="num">${n}</div><div class="lbl">${l}</div></div>`).join('');
+    const d = await api('/api/admin/users?size=5');
+    $('#recentUsers').innerHTML = d.items.map(u =>
+      `<tr><td>${u.id}</td><td>${esc(u.username)}</td><td>${esc(u.nickname)}</td>
+       <td><span class="tag ${u.role}">${u.role==='admin'?'管理员':'用户'}</span></td><td>${u.created_at}</td></tr>`).join('')
+      || '<tr><td colspan="5" class="empty">暂无用户</td></tr>';
+  }catch(e){ console.error(e); }
+}
+
+/* ---------------- 用户管理 ---------------- */
+async function loadUsers(){
+  const q = $('#uSearch').value.trim();
+  const d = await api(`/api/admin/users?search=${encodeURIComponent(q)}&page=${uPage}&size=10`);
+  $('#userRows').innerHTML = d.items.map(u => `
+    <tr>
+      <td>${u.id}</td>
+      <td><b>${esc(u.username)}</b></td>
+      <td>${esc(u.nickname)}</td>
+      <td><span class="tag ${u.role}">${u.role==='admin'?'管理员':'用户'}</span></td>
+      <td>${u.health_profile_id ? u.health_profile_id+'号' : '-'}</td>
+      <td>${esc(u.phone) || '-'}</td>
+      <td><span class="tag ${u.is_active?'on':'off'}">${u.is_active?'启用':'禁用'}</span></td>
+      <td>${u.created_at}</td>
+      <td>${u.last_login_at || '-'}</td>
+      <td>
+        <button class="btn mini" onclick='editUser(${JSON.stringify(u).replace(/'/g,"&#39;")})'>编辑</button>
+        <button class="btn mini" onclick="resetPwd(${u.id},'${esc(u.username)}')">重置密码</button>
+        <button class="btn mini danger" onclick="delUser(${u.id},'${esc(u.username)}')">删除</button>
+      </td>
+    </tr>`).join('') || '<tr><td colspan="10" class="empty">没有匹配的用户</td></tr>';
+  renderPager('#userPager', d, uPage, p => { uPage = p; loadUsers(); });
+}
+function renderPager(sel, d, cur, go){
+  const pages = Math.max(1, Math.ceil(d.total / d.size));
+  $(sel).innerHTML = `<span>共 ${d.total} 条 · ${pages} 页</span>
+    <button ${cur<=1?'disabled':''} onclick="void(0)" data-prev>上一页</button>
+    <span>第 ${cur} / ${pages} 页</span>
+    <button ${cur>=pages?'disabled':''} data-next>下一页</button>`;
+  const prev = $(sel+' [data-prev]'), next = $(sel+' [data-next]');
+  if(prev) prev.onclick = () => go(cur-1);
+  if(next) next.onclick = () => go(cur+1);
+}
+$('#uSearchBtn').onclick = () => { uPage = 1; loadUsers(); };
+$('#uSearch').addEventListener('keydown', e => { if(e.key==='Enter'){ uPage=1; loadUsers(); } });
+
+let editingId = null;
+$('#uAdd').onclick = () => {
+  editingId = null;
+  $('#umTitle').textContent = '新增用户';
+  $('#umUsernameWrap').style.display='block'; $('#umUsername').value=''; $('#umUsername').disabled=false;
+  $('#umPasswordWrap').style.display='block'; $('#umPasswordLabel').textContent='密码'; $('#umPassword').value='';
+  $('#umNickname').value=''; $('#umRole').value='user'; $('#umProfile').value=''; $('#umPhone').value='';
+  $('#umActiveWrap').style.display='none'; $('#umErr').textContent='';
+  showMask('userMask');
+};
+function editUser(u){
+  editingId = u.id;
+  $('#umTitle').textContent = '编辑用户 #' + u.id;
+  $('#umUsernameWrap').style.display='block'; $('#umUsername').value=u.username; $('#umUsername').disabled=true;
+  $('#umPasswordWrap').style.display='none';
+  $('#umNickname').value=u.nickname||''; $('#umRole').value=u.role;
+  $('#umProfile').value=u.health_profile_id||''; $('#umPhone').value=u.phone||'';
+  $('#umActiveWrap').style.display='block'; $('#umActive').value=u.is_active?'1':'0';
+  $('#umErr').textContent='';
+  showMask('userMask');
+}
+$('#umSave').onclick = async () => {
+  try{
+    if(editingId == null){
+      await api('/api/admin/users', {method:'POST', body: JSON.stringify({
+        username: $('#umUsername').value.trim(), password: $('#umPassword').value,
+        nickname: $('#umNickname').value.trim(), role: $('#umRole').value,
+        health_profile_id: $('#umProfile').value ? parseInt($('#umProfile').value) : null,
+        phone: $('#umPhone').value.trim() || null })});
+    }else{
+      await api(`/api/admin/users/${editingId}`, {method:'PUT', body: JSON.stringify({
+        nickname: $('#umNickname').value.trim(), role: $('#umRole').value,
+        health_profile_id: $('#umProfile').value ? parseInt($('#umProfile').value) : null,
+        phone: $('#umPhone').value.trim() || null,
+        is_active: $('#umActive').value === '1' })});
+    }
+    hideMask('userMask'); loadUsers(); loadDash();
+  }catch(e){ $('#umErr').textContent = e.message; }
+};
+async function resetPwd(id, name){
+  const pwd = prompt(`为用户「${name}」设置新密码（至少6位）：`);
+  if(!pwd) return;
+  try{
+    await api(`/api/admin/users/${id}`, {method:'PUT', body: JSON.stringify({new_password: pwd})});
+    alert('密码已重置');
+  }catch(e){ alert('失败：' + e.message); }
+}
+async function delUser(id, name){
+  if(!confirm(`确定删除用户「${name}」？该操作不可恢复（其历史会话保留）。`)) return;
+  try{
+    await api(`/api/admin/users/${id}`, {method:'DELETE'});
+    loadUsers(); loadDash();
+  }catch(e){ alert('失败：' + e.message); }
+}
+
+/* ---------------- 会话记录 ---------------- */
+async function loadSessions(){
+  const q = $('#sSearch').value.trim();
+  const d = await api(`/api/admin/sessions?search=${encodeURIComponent(q)}&page=${sPage}&size=10`);
+  $('#sessRows').innerHTML = d.items.map(s => `
+    <tr>
+      <td style="font-family:monospace;font-size:12px">${s.session_id}</td>
+      <td>${esc(s.title) || '（未命名）'}</td>
+      <td>${esc(s.username)}${s.nickname && s.nickname!==s.username ? '（'+esc(s.nickname)+'）' : ''}</td>
+      <td>${s.msg_count}</td>
+      <td>${s.created_at}</td>
+      <td><button class="btn mini" onclick="viewSess('${s.session_id}')">查看</button></td>
+    </tr>`).join('') || '<tr><td colspan="6" class="empty">暂无会话记录</td></tr>';
+  renderPager('#sessPager', d, sPage, p => { sPage = p; loadSessions(); });
+}
+$('#sSearchBtn').onclick = () => { sPage = 1; loadSessions(); };
+$('#sSearch').addEventListener('keydown', e => { if(e.key==='Enter'){ sPage=1; loadSessions(); } });
+async function viewSess(sid){
+  const d = await api(`/api/admin/sessions/${sid}/messages`);
+  $('#cmTitle').textContent = '会话 ' + sid;
+  $('#cmView').innerHTML = d.items.map(m =>
+    `<div class="cv-msg"><b>${m.role==='user'?'用户':'助手'}：</b>${esc(m.content)}</div>`).join('') || '<div class="empty">无消息</div>';
+  showMask('chatMask');
+}
+
+boot();
+</script>
+</body>
+</html>

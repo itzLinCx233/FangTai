@@ -10,4 +10,7 @@ jieba>=0.42.1
 rank-bm25>=0.2.2
 pandas>=2.2.0
 numpy<2.0.0
+
+# MySQL 用户系统
+PyMySQL>=1.1.0
 # 本地 GPU 模式（RAG_PROVIDER=local）额外依赖见 requirements-local.txt

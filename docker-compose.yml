@@ -2,19 +2,43 @@
 #
 # RAG 已切换为阿里云百炼 API（嵌入 text-embedding-v4 + 重排 gte-rerank），
 # 无需本地 GPU；BM25 仍为本地内存索引，云 API 异常时自动降级纯 BM25。
+# 用户系统由 MySQL 管理（内置 mysql 服务 + 自动建库建表 + 自动创建管理员）。
 #
 # 启动：
 #   docker compose up -d --build
-#   open http://127.0.0.1:8000
+#   open http://127.0.0.1:8000        # 聊天页
+#   open http://127.0.0.1:8000/admin  # 管理后台（admin / admin123，可经环境变量覆盖）
 # 评测：
 #   py -3 scripts/eval.py --api http://127.0.0.1:8000
+# 评测环境无 MySQL 时：给 meal-agent 设 MYSQL_ENABLED=false，核心端点不受影响。
 
 services:
+  mysql:
+    image: mysql:8.4
+    container_name: fangtai-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: fangtai_mysql_2026
+      MYSQL_DATABASE: fangtai
+    volumes:
+      - mysql-data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-pfangtai_mysql_2026"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    # 需要从宿主机直连数据库时放开下面端口
+    # ports: ["3306:3306"]
+
   meal-agent:
     build: .
     image: fangtai-meal-agent:latest
     container_name: fangtai-meal-agent
     ports: ["8000:8000"]
+    depends_on:
+      mysql:
+        condition: service_healthy
     environment:
       # ---------------- LLM（OpenAI 兼容协议，可换 DeepSeek/vLLM/Ollama 等） ----------------
       # 部署时把 LLM_API_KEY 替换为你自己的密钥（智谱开放平台 https://open.bigmodel.cn）
@@ -35,6 +59,16 @@ services:
       RECALL_TOPK: "60"
       RERANK_TOPK: "20"
       FINAL_CANDIDATES: "12"
+      # ---------------- MySQL 用户系统 ----------------
+      MYSQL_ENABLED: "true"
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_USER: root
+      MYSQL_PASSWORD: fangtai_mysql_2026   # 与 mysql 服务 MYSQL_ROOT_PASSWORD 一致
+      MYSQL_DATABASE: fangtai
+      ADMIN_USERNAME: admin                # 首次启动自动创建（已存在则跳过）
+      ADMIN_PASSWORD: admin123
+      AUTH_SECRET: change-me-in-production # token 签名密钥，生产部署务必修改
       # ---------------- 本地 GPU 模式（可选，一般不用） ----------------
       # RAG_PROVIDER: local 时改用 CUDA 版 Dockerfile 并安装 requirements-local.txt，
       # 且需要 GPU runtime；详见 docs/部署文档.md
@@ -47,6 +81,10 @@ services:
       timeout: 10s
       retries: 5
       start_period: 300s   # 首次启动含云端索引构建（约 200 次 API 调用）
+
+volumes:
+  index-cache:
+  mysql-data:
 
 volumes:
   index-cache:

@@ -19,13 +19,15 @@
 - 多人多约束宴请：约束并集合并、荤素比/烹饪方式多样性、按人营养核算
 - 多轮动态交互：约束追加、局部替换、方案否定、模糊追问澄清、需求矛盾折中、上下文不遗忘
 - SSE 流式 API + Web 聊天界面 + Docker 一键部署（云端 RAG 零 GPU；可切本地 GPU 模式）
+- 用户系统：MySQL 管理（注册/登录/个人中心/健康档案绑定），管理员后台 `/admin` 增删改查
 
 ## 快速开始
 
 ```bash
 # Docker（无需 GPU：RAG 用阿里云百炼 API；先把 LLM_API_KEY 和 DASHSCOPE_API_KEY 换成你的密钥）
 docker compose up -d --build
-open http://127.0.0.1:8000
+open http://127.0.0.1:8000         # 聊天页（右上角登录/注册）
+open http://127.0.0.1:8000/admin   # 管理后台（admin / admin123）
 
 # 本地开发
 pip install -r requirements.txt

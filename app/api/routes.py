@@ -5,7 +5,7 @@ import asyncio
 import json
 import time
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import StreamingResponse, FileResponse
 from pydantic import BaseModel, Field
 
@@ -18,6 +18,32 @@ router = APIRouter(prefix="/api")
 
 # 会话注册表（生产可换 Redis；评测单进程内存即可）
 _sessions: dict[str, dlg.DialogSession] = {}
+
+
+def _optional_user(authorization: str | None) -> dict | None:
+    """登录用户（可选）：无效/未登录返回 None，不阻断匿名评测调用。"""
+    import app.db as db
+    from app.core import security
+    if not authorization or not authorization.startswith("Bearer ") or not db.db_ready():
+        return None
+    payload = security.parse_token(authorization[7:])
+    if not payload:
+        return None
+    user = db.get_user_by_id(payload["uid"])
+    if user and user.get("is_active", 1):
+        return user
+    return None
+
+
+def _merged_profile_ids(req_profile_ids: list[int], user: dict | None) -> list[int]:
+    """登录用户：其绑定档案 + 请求携带的同餐人档案（去重）。匿名：仅请求档案。"""
+    ids: list[int] = []
+    if user and user.get("health_profile_id"):
+        ids.append(int(user["health_profile_id"]))
+    for pid in req_profile_ids or []:
+        if pid and pid not in ids:
+            ids.append(pid)
+    return ids
 
 
 class ChatRequest(BaseModel):
@@ -49,18 +75,35 @@ def _get_session(req: ChatRequest) -> dlg.DialogSession:
 
 
 @router.post("/chat")
-async def chat(req: ChatRequest):
-    """多轮对话（SSE 流式）。事件类型：intent / plan / delta / clarify / done。"""
+async def chat(req: ChatRequest, authorization: str | None = Header(None)):
+    """多轮对话（SSE 流式）。事件类型：intent / plan / delta / clarify / done。
+
+    匿名可用（评测兼容）；登录用户自动叠加其绑定档案约束，并把对话落库。
+    """
+    user = _optional_user(authorization)
+    req.profile_ids = _merged_profile_ids(req.profile_ids, user)
     sess = _get_session(req)
     agent = get_agent()
 
     async def gen():
+        reply_parts: list[str] = []
         try:
             async for ev in agent.stream_chat(sess, req.message):
+                if ev.get("type") == "delta":
+                    reply_parts.append(ev.get("text", ""))
                 yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
             yield f"data: {json.dumps({'type': 'end', 'session_id': sess.session_id}, ensure_ascii=False)}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
+        # 登录用户：会话与消息落库（不阻塞流）
+        if user:
+            try:
+                import app.db as db
+                db.save_session(sess.session_id, user["id"], req.message)
+                db.save_message(sess.session_id, "user", req.message)
+                db.save_message(sess.session_id, "assistant", "".join(reply_parts))
+            except Exception as e:
+                print(f"[routes] 会话落库失败: {e}")
 
     return StreamingResponse(
         gen(), media_type="text/event-stream",
@@ -70,14 +113,25 @@ async def chat(req: ChatRequest):
 
 
 @router.post("/recommend")
-async def recommend(req: RecommendRequest):
+async def recommend(req: RecommendRequest, authorization: str | None = Header(None)):
     """单轮推荐（非流式 JSON）：便于程序化评测/其他应用集成。"""
+    user = _optional_user(authorization)
+    req.profile_ids = _merged_profile_ids(req.profile_ids, user)
     sess = _get_session(req)
     agent = get_agent()
     events = []
     t0 = time.perf_counter()
     async for ev in agent.stream_chat(sess, req.message):
         events.append(ev)
+    if user:
+        try:
+            import app.db as db
+            text = "".join(e.get("text", "") for e in events if e.get("type") == "delta")
+            db.save_session(sess.session_id, user["id"], req.message)
+            db.save_message(sess.session_id, "user", req.message)
+            db.save_message(sess.session_id, "assistant", text)
+        except Exception as e:
+            print(f"[routes] 会话落库失败: {e}")
     plan = next((e for e in events if e.get("type") == "plan"), None)
     clarify = next((e for e in events if e.get("type") == "clarify"), None)
     text = "".join(e.get("text", "") for e in events if e.get("type") == "delta")

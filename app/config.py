@@ -50,3 +50,18 @@ FINAL_CANDIDATES = int(os.getenv("FINAL_CANDIDATES", "12"))  # 注入 prompt 的
 # ---------------- 服务 ----------------
 HOST = os.getenv("HOST", "0.0.0.0")
 PORT = int(os.getenv("PORT", "8000"))
+
+# ---------------- MySQL（用户系统；评测环境可 MYSQL_ENABLED=false 跳过） ----------------
+MYSQL_ENABLED = os.getenv("MYSQL_ENABLED", "true").lower() in ("1", "true", "yes", "on")
+MYSQL_HOST = os.getenv("MYSQL_HOST", "127.0.0.1")
+MYSQL_PORT = int(os.getenv("MYSQL_PORT", "3306"))
+MYSQL_USER = os.getenv("MYSQL_USER", "root")
+MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", "")
+MYSQL_DATABASE = os.getenv("MYSQL_DATABASE", "fangtai")
+MYSQL_POOL_SIZE = int(os.getenv("MYSQL_POOL_SIZE", "8"))
+# 管理员账户（首次初始化自动创建，已存在则跳过）
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
+# 登录 token 签名密钥与有效期
+AUTH_SECRET = os.getenv("AUTH_SECRET", "fangtai-agent-secret-change-me")
+AUTH_TOKEN_TTL_H = int(os.getenv("AUTH_TOKEN_TTL_H", "168"))  # 7 天

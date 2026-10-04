@@ -18,14 +18,28 @@ header h1{font-size:17px;font-weight:600}
 header .sub{font-size:12px;color:var(--muted)}
 header .spacer{flex:1}
 .controls{display:flex;gap:10px;align-items:center;font-size:13px}
-.controls select{padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:13px;max-width:230px}
-.controls button{padding:7px 14px;border:1px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;font-size:13px}
-.controls button:hover{background:var(--primary-light)}
+.btn{padding:7px 14px;border:1px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;font-size:13px;color:var(--text)}
+.btn:hover{background:var(--primary-light);border-color:var(--primary)}
+.btn.primary{background:var(--primary);color:#fff;border-color:var(--primary)}
+.btn.primary:hover{background:#0c5c4c}
+.btn.danger{color:var(--danger)}
+.btn.danger:hover{background:#fdeeed;border-color:var(--danger)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+/* 用户菜单 */
+.user-box{position:relative;display:flex;align-items:center;gap:8px}
+.avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#5470c6,#7a90da);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;user-select:none}
+.avatar.admin{background:linear-gradient(135deg,var(--accent),#f0b95f)}
+.user-name{font-size:13px;font-weight:500;cursor:pointer}
+.user-menu{position:absolute;right:0;top:44px;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.1);min-width:150px;padding:6px;display:none;z-index:30}
+.user-menu.show{display:block}
+.user-menu a{display:block;padding:9px 12px;border-radius:7px;font-size:13px;color:var(--text);cursor:pointer;text-decoration:none}
+.user-menu a:hover{background:var(--primary-light);color:var(--primary)}
+.user-menu .sep{height:1px;background:var(--border);margin:4px 6px}
 main{flex:1;overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:18px}
 .msg{display:flex;gap:12px;max-width:860px;width:100%;margin:0 auto}
-.msg .avatar{width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:15px;color:#fff}
-.msg.user .avatar{background:#5470c6}
-.msg.ai .avatar{background:var(--primary)}
+.msg .avatar-c{width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:15px;color:#fff}
+.msg.user .avatar-c{background:#5470c6}
+.msg.ai .avatar-c{background:var(--primary)}
 .bubble{padding:12px 16px;border-radius:12px;line-height:1.7;font-size:14.5px;white-space:pre-wrap;word-break:break-word;max-width:calc(100% - 60px)}
 .msg.user .bubble{background:var(--user-bg);color:#fff;border-top-left-radius:4px}
 .msg.ai .bubble{background:var(--ai-bg);border:1px solid var(--border);border-top-left-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
@@ -60,6 +74,37 @@ textarea:focus{border-color:var(--primary)}
 .welcome{max-width:860px;margin:auto;text-align:center;padding:40px 20px}
 .welcome h2{font-size:20px;margin-bottom:8px;color:var(--primary)}
 .welcome p{color:var(--muted);font-size:14px;margin-bottom:20px}
+/* 模态框 */
+.modal-mask{position:fixed;inset:0;background:rgba(20,26,32,.45);display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
+.modal-mask.show{display:flex}
+.modal{background:#fff;border-radius:14px;width:440px;max-width:100%;max-height:88vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.modal.wide{width:640px}
+.modal-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#fff;z-index:2}
+.modal-head h3{font-size:16px}
+.close-x{border:none;background:none;font-size:20px;color:var(--muted);cursor:pointer;line-height:1}
+.modal-body{padding:20px}
+.tabs{display:flex;gap:0;margin-bottom:18px;border-bottom:1px solid var(--border)}
+.tabs div{flex:1;text-align:center;padding:10px;cursor:pointer;font-size:14px;color:var(--muted);border-bottom:2px solid transparent}
+.tabs div.on{color:var(--primary);border-bottom-color:var(--primary);font-weight:600}
+.form-item{margin-bottom:14px}
+.form-item label{display:block;font-size:13px;color:#4a5361;margin-bottom:6px}
+.form-item input,.form-item select{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;outline:none;font-family:inherit}
+.form-item input:focus,.form-item select:focus{border-color:var(--primary)}
+.form-item .hint{font-size:12px;color:var(--muted);margin-top:4px}
+.form-item select[multiple]{height:auto;min-height:96px}
+.err{color:var(--danger);font-size:13px;min-height:18px;margin-bottom:8px}
+.modal-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px}
+/* 用户中心 */
+.uc-section{margin-bottom:20px}
+.uc-section h4{font-size:14px;margin-bottom:10px;color:var(--primary)}
+.sess-list{display:flex;flex-direction:column;gap:8px}
+.sess-item{border:1px solid var(--border);border-radius:10px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;background:#fbfcfd}
+.sess-item:hover{border-color:var(--primary)}
+.sess-item .t{font-size:14px;font-weight:500}
+.sess-item .m{font-size:12px;color:var(--muted)}
+.chat-view{max-height:300px;overflow:auto;border:1px solid var(--border);border-radius:10px;padding:12px;background:#fbfcfd}
+.chat-view .cv-msg{margin-bottom:10px;font-size:13px;line-height:1.6}
+.chat-view .cv-msg b{color:var(--primary)}
 </style>
 </head>
 <body>
@@ -71,15 +116,25 @@ textarea:focus{border-color:var(--primary)}
   </div>
   <div class="spacer"></div>
   <div class="controls">
-    <label>健康档案</label>
-    <select id="profileSel" multiple size="1" title="可多选：多人宴请场景"></select>
-    <button id="newChat">新对话</button>
+    <button class="btn" id="newChat">新对话</button>
+    <!-- 用户中心（未登录显示登录按钮，已登录显示头像菜单） -->
+    <div class="user-box" id="userBox" style="display:none">
+      <div class="avatar" id="userAvatar">?</div>
+      <div class="user-name" id="userName"></div>
+      <div class="user-menu" id="userMenu">
+        <a id="menuCenter">个人中心</a>
+        <a id="menuAdmin" style="display:none">管理后台</a>
+        <div class="sep"></div>
+        <a id="menuLogout" style="color:var(--danger)">退出登录</a>
+      </div>
+    </div>
+    <button class="btn primary" id="loginBtn">登录 / 注册</button>
   </div>
 </header>
 <main id="chat">
   <div class="welcome" id="welcome">
     <h2>您好，我是您的健康膳食助手 🥗</h2>
-    <p>告诉我吃什么、几个人吃、有什么忌口，我来为您规划一餐<br>选择左侧健康档案后，推荐会自动规避过敏原与慢病忌口</p>
+    <p>告诉我吃什么、几个人吃、有什么忌口，我来为您规划一餐<br>登录后可在个人中心绑定健康档案，推荐自动规避过敏原与慢病忌口</p>
   </div>
 </main>
 <footer>
@@ -95,50 +150,248 @@ textarea:focus{border-color:var(--primary)}
   </div>
   <div class="stats" id="stats"></div>
 </footer>
+
+<!-- 登录/注册模态框 -->
+<div class="modal-mask" id="authMask">
+  <div class="modal">
+    <div class="modal-head"><h3>账号</h3><button class="close-x" data-close="authMask">×</button></div>
+    <div class="modal-body">
+      <div class="tabs">
+        <div id="tabLogin" class="on">登录</div>
+        <div id="tabReg">注册</div>
+      </div>
+      <div class="err" id="authErr"></div>
+      <div id="loginForm">
+        <div class="form-item"><label>用户名</label><input id="liUser" placeholder="用户名" autocomplete="username"></div>
+        <div class="form-item"><label>密码</label><input id="liPass" type="password" placeholder="密码" autocomplete="current-password"></div>
+        <button class="btn primary" id="doLogin" style="width:100%;padding:10px">登 录</button>
+      </div>
+      <div id="regForm" style="display:none">
+        <div class="form-item"><label>用户名</label><input id="rgUser" placeholder="3-32位，字母/数字/下划线/中文"><div class="hint">管理员账户请联系管理员创建</div></div>
+        <div class="form-item"><label>昵称</label><input id="rgNick" placeholder="怎么称呼您（可空）"></div>
+        <div class="form-item"><label>密码</label><input id="rgPass" type="password" placeholder="至少6位"></div>
+        <div class="form-item"><label>绑定健康档案</label><select id="rgProfile"></select><div class="hint">推荐将自动规避该档案的过敏原与慢病忌口，可稍后在个人中心修改</div></div>
+        <button class="btn primary" id="doReg" style="width:100%;padding:10px">注 册</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 个人中心模态框 -->
+<div class="modal-mask" id="ucMask">
+  <div class="modal wide">
+    <div class="modal-head"><h3>个人中心</h3><button class="close-x" data-close="ucMask">×</button></div>
+    <div class="modal-body">
+      <div class="uc-section">
+        <h4>📊 账号信息</h4>
+        <div id="ucInfo" style="font-size:13px;color:#4a5361;line-height:1.9"></div>
+      </div>
+      <div class="uc-section">
+        <h4>👤 资料设置</h4>
+        <div class="form-item"><label>昵称</label><input id="ucNick"></div>
+        <div class="form-item"><label>我的健康档案</label><select id="ucProfile"></select><div class="hint">对话推荐将自动应用该档案的过敏/忌口/健康需求约束</div></div>
+        <div class="form-item"><label>同餐人档案（多人宴请，可多选）</label><select id="ucCompanions" multiple></select><div class="hint">选择与您一起吃饭的人的健康档案，整桌菜将同时满足所有人约束</div></div>
+        <button class="btn primary" id="ucSave">保存资料</button>
+      </div>
+      <div class="uc-section">
+        <h4>🔒 修改密码</h4>
+        <div class="form-item"><label>原密码</label><input id="ucOldPass" type="password"></div>
+        <div class="form-item"><label>新密码</label><input id="ucNewPass" type="password" placeholder="至少6位"></div>
+        <button class="btn" id="ucPassBtn">修改密码</button>
+      </div>
+      <div class="uc-section">
+        <h4>🕘 历史会话</h4>
+        <div class="sess-list" id="ucSessions"></div>
+        <div id="ucSessionView" style="display:none;margin-top:12px">
+          <div class="chat-view" id="ucChatView"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 const $ = s => document.querySelector(s);
 const chat = $('#chat'), input = $('#input'), send = $('#send');
-let sessionId = null, profileIds = [], busy = false;
+let sessionId = null, busy = false;
+let token = localStorage.getItem('ft_token') || '';
+let currentUser = null;
+let companions = JSON.parse(localStorage.getItem('ft_companions') || '[]');
+let profilesCache = [];
 
-async function loadProfiles(){
-  const r = await fetch('/api/profiles?kind=simple');
-  const d = await r.json();
-  const sel = $('#profileSel');
-  sel.innerHTML = '';
-  d.items.forEach(p=>{
-    const opt = document.createElement('option');
-    opt.value = p.id;
-    const tags = [];
-    if((p['特殊人群']||[]).length) tags.push(p['特殊人群'].join('/'));
-    if((p['过敏食材']||[]).length) tags.push('过敏:'+p['过敏食材'].join('/'));
-    opt.textContent = `${p.id}号 ${p['性别']} ${p['年龄']}岁 ${tags.join(' ')}`;
-    sel.appendChild(opt);
-  });
-  sel.size = Math.min(6, Math.max(3, d.items.length));
-  sel.addEventListener('change', ()=>{
-    profileIds = [...sel.selectedOptions].map(o=>+o.value);
-  });
-  sel.selectedIndex = 2;
-  profileIds = [d.items[2].id];
+function authHeaders(){
+  return token ? {'Authorization': 'Bearer ' + token} : {};
+}
+async function api(path, opts={}){
+  opts.headers = Object.assign({'Content-Type':'application/json'}, authHeaders(), opts.headers||{});
+  const r = await fetch(path, opts);
+  if(!r.ok){
+    let msg = r.status + ' 错误';
+    try{ msg = (await r.json()).detail || msg; }catch(e){}
+    throw new Error(msg);
+  }
+  return r.json();
 }
 
+/* ---------------- 档案数据 ---------------- */
+async function loadProfiles(){
+  const d = await (await fetch('/api/profiles?kind=simple')).json();
+  profilesCache = d.items;
+  const label = p => `${p.id}号 ${p['性别']} ${p['年龄']}岁` +
+      ((p['特殊人群']||[]).length? ' '+p['特殊人群'].join('/') : '') +
+      ((p['过敏食材']||[]).length? ' 过敏:'+p['过敏食材'].join('/') : '');
+  // 注册选择框
+  const rg = $('#rgProfile');
+  rg.innerHTML = '<option value="">暂不绑定</option>' +
+      d.items.map(p=>`<option value="${p.id}">${label(p)}</option>`).join('');
+  // 个人中心两个选择框
+  const opts = d.items.map(p=>`<option value="${p.id}">${label(p)}</option>`).join('');
+  $('#ucProfile').innerHTML = '<option value="">暂不绑定</option>' + opts;
+  $('#ucCompanions').innerHTML = opts;
+}
+function currentProfileIds(){
+  const ids = [];
+  if(currentUser && currentUser.health_profile_id) ids.push(currentUser.health_profile_id);
+  companions.forEach(pid => { if(!ids.includes(pid)) ids.push(pid); });
+  return ids;
+}
+
+/* ---------------- 用户态渲染 ---------------- */
+function renderUser(){
+  const box = $('#userBox'), loginBtn = $('#loginBtn');
+  if(currentUser){
+    box.style.display = 'flex'; loginBtn.style.display = 'none';
+    $('#userName').textContent = currentUser.nickname || currentUser.username;
+    $('#userAvatar').textContent = (currentUser.nickname || currentUser.username)[0].toUpperCase();
+    $('#userAvatar').classList.toggle('admin', currentUser.role === 'admin');
+    $('#menuAdmin').style.display = currentUser.role === 'admin' ? 'block' : 'none';
+  }else{
+    box.style.display = 'none'; loginBtn.style.display = 'block';
+  }
+}
+async function refreshMe(){
+  if(!token){ currentUser = null; renderUser(); return; }
+  try{ currentUser = await api('/api/auth/me'); }
+  catch(e){ token=''; localStorage.removeItem('ft_token'); currentUser=null; }
+  renderUser();
+}
+
+/* ---------------- 登录/注册 ---------------- */
+$('#loginBtn').onclick = () => { $('#authMask').classList.add('show'); };
+document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => $('#'+b.dataset.close).classList.remove('show'));
+$('#tabLogin').onclick = () => switchTab(true);
+$('#tabReg').onclick = () => switchTab(false);
+function switchTab(login){
+  $('#tabLogin').classList.toggle('on', login); $('#tabReg').classList.toggle('on', !login);
+  $('#loginForm').style.display = login?'block':'none'; $('#regForm').style.display = login?'none':'block';
+  $('#authErr').textContent = '';
+}
+$('#doLogin').onclick = async () => {
+  try{
+    const d = await api('/api/auth/login', {method:'POST', body: JSON.stringify({
+      username: $('#liUser').value.trim(), password: $('#liPass').value})});
+    token = d.token; localStorage.setItem('ft_token', token);
+    currentUser = d.user; renderUser();
+    $('#authMask').classList.remove('show'); $('#authErr').textContent='';
+    addSystemMsg('已登录：' + (d.user.nickname || d.user.username) +
+      (d.user.health_profile_id ? '，健康档案约束已生效' : '，可在个人中心绑定健康档案'));
+  }catch(e){ $('#authErr').textContent = e.message; }
+};
+$('#doReg').onclick = async () => {
+  try{
+    const pid = $('#rgProfile').value ? parseInt($('#rgProfile').value) : null;
+    const d = await api('/api/auth/register', {method:'POST', body: JSON.stringify({
+      username: $('#rgUser').value.trim(), password: $('#rgPass').value,
+      nickname: $('#rgNick').value.trim(), health_profile_id: pid})});
+    token = d.token; localStorage.setItem('ft_token', token);
+    currentUser = d.user; renderUser();
+    $('#authMask').classList.remove('show');
+    addSystemMsg('注册成功，欢迎 ' + (d.user.nickname || d.user.username) + '！');
+  }catch(e){ $('#authErr').textContent = e.message; }
+};
+$('#userAvatar').onclick = $('#userName').onclick = () => $('#userMenu').classList.toggle('show');
+document.addEventListener('click', e => {
+  if(!e.target.closest('.user-box')) $('#userMenu').classList.remove('show');
+});
+$('#menuLogout').onclick = () => {
+  token=''; currentUser=null; localStorage.removeItem('ft_token');
+  renderUser(); addSystemMsg('已退出登录（匿名模式仍可继续使用）');
+};
+
+/* ---------------- 个人中心 ---------------- */
+$('#menuCenter').onclick = async () => { $('#userMenu').classList.remove('show'); await openUserCenter(); };
+$('#menuAdmin').onclick = () => { window.open('/admin', '_blank'); };
+async function openUserCenter(){
+  if(!currentUser) return;
+  $('#ucInfo').innerHTML = `用户名：<b>${currentUser.username}</b> ｜ 角色：${currentUser.role==='admin'?'管理员':'普通用户'}<br>注册时间：${currentUser.created_at} ｜ 最后登录：${currentUser.last_login_at || '-'}`;
+  $('#ucNick').value = currentUser.nickname || '';
+  $('#ucProfile').value = currentUser.health_profile_id || '';
+  [...$('#ucCompanions').options].forEach(o => o.selected = companions.includes(parseInt(o.value)));
+  $('#ucSessions').innerHTML = '<div style="color:var(--muted);font-size:13px">加载中…</div>';
+  $('#ucSessionView').style.display = 'none';
+  $('#ucMask').classList.add('show');
+  try{
+    const d = await api('/api/auth/sessions');
+    $('#ucSessions').innerHTML = d.items.length ? d.items.map(s =>
+      `<div class="sess-item" data-sid="${s.session_id}">
+         <div><div class="t">${s.title || '（未命名会话）'}</div><div class="m">${s.created_at} · ${s.msg_count} 条消息</div></div>
+         <div style="color:var(--muted)">›</div>
+       </div>`).join('') : '<div style="color:var(--muted);font-size:13px">暂无历史会话，去聊一餐吧～</div>';
+    $('#ucSessions').querySelectorAll('.sess-item').forEach(el => el.onclick = async () => {
+      const d2 = await api(`/api/auth/sessions/${el.dataset.sid}/messages`);
+      $('#ucChatView').innerHTML = d2.items.map(m =>
+        `<div class="cv-msg"><b>${m.role==='user'?'我':'助手'}：</b>${m.content.replace(/</g,'&lt;')}</div>`).join('');
+      $('#ucSessionView').style.display = 'block';
+    });
+  }catch(e){ $('#ucSessions').innerHTML = `<div style="color:var(--danger);font-size:13px">${e.message}</div>`; }
+}
+$('#ucSave').onclick = async () => {
+  try{
+    companions = [...$('#ucCompanions').selectedOptions].map(o => parseInt(o.value));
+    localStorage.setItem('ft_companions', JSON.stringify(companions));
+    currentUser = await api('/api/auth/profile', {method:'PUT', body: JSON.stringify({
+      nickname: $('#ucNick').value.trim(),
+      health_profile_id: $('#ucProfile').value ? parseInt($('#ucProfile').value) : null,
+    })});
+    renderUser();
+    addSystemMsg('资料已保存' + (companions.length ? `，同餐人约束：${companions.join('、')} 号档案` : ''));
+    $('#ucMask').classList.remove('show');
+  }catch(e){ alert('保存失败：' + e.message); }
+};
+$('#ucPassBtn').onclick = async () => {
+  try{
+    await api('/api/auth/profile', {method:'PUT', body: JSON.stringify({
+      old_password: $('#ucOldPass').value, new_password: $('#ucNewPass').value})});
+    $('#ucOldPass').value = $('#ucNewPass').value = '';
+    alert('密码修改成功');
+  }catch(e){ alert('修改失败：' + e.message); }
+};
+
+function addSystemMsg(text){
+  $('#welcome')?.remove();
+  const div = document.createElement('div');
+  div.className = 'msg ai';
+  div.innerHTML = `<div class="avatar-c">🥗</div><div class="bubble" style="background:#f0f7f5;border-color:#cfe5df;color:#3c6b5d;font-size:13px"></div>`;
+  div.querySelector('.bubble').textContent = text;
+  chat.appendChild(div); chat.scrollTop = chat.scrollHeight;
+}
+
+/* ---------------- 聊天（登录自动带档案约束 + Authorization） ---------------- */
 function addMsg(role, text){
   $('#welcome')?.remove();
   const div = document.createElement('div');
   div.className = 'msg ' + (role==='user'?'user':'ai');
-  div.innerHTML = `<div class="avatar">${role==='user'?'🧑':'🥗'}</div><div class="bubble"></div>`;
+  div.innerHTML = `<div class="avatar-c">${role==='user'?'🧑':'🥗'}</div><div class="bubble"></div>`;
   div.querySelector('.bubble').textContent = text;
   chat.appendChild(div);
   chat.scrollTop = chat.scrollHeight;
   return div.querySelector('.bubble');
 }
-
 function addTyping(){
   const b = addMsg('ai','');
   b.innerHTML = '<span class="typing"><i></i><i></i><i></i></span>';
   return b;
 }
-
 function renderPlan(ev){
   $('#welcome')?.remove();
   const card = document.createElement('div');
@@ -170,7 +423,6 @@ function renderPlan(ev){
   chat.appendChild(card);
   chat.scrollTop = chat.scrollHeight;
 }
-
 async function sendMsg(){
   const text = input.value.trim();
   if(!text || busy) return;
@@ -182,8 +434,9 @@ async function sendMsg(){
   let firstTok = null, replaced = false;
   try{
     const resp = await fetch('/api/chat', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({message:text, session_id:sessionId, profile_ids:profileIds})
+      method:'POST',
+      headers: Object.assign({'Content-Type':'application/json'}, authHeaders()),
+      body: JSON.stringify({message:text, session_id:sessionId, profile_ids: currentProfileIds()})
     });
     sessionId = resp.headers.get('X-Session-Id') || sessionId;
     const reader = resp.body.getReader();
@@ -218,7 +471,6 @@ async function sendMsg(){
     busy = false; send.disabled = false;
   }
 }
-
 send.onclick = sendMsg;
 input.addEventListener('keydown', e=>{
   if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendMsg(); }
@@ -227,6 +479,7 @@ $('#newChat').onclick = ()=>{ sessionId=null; chat.innerHTML=''; $('#stats').tex
 document.querySelectorAll('.quick button').forEach(b=>b.onclick=()=>{ input.value=b.dataset.q; sendMsg(); });
 
 loadProfiles();
+refreshMe();
 </script>
 </body>
 </html>

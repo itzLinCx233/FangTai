@@ -95,8 +95,12 @@ async def update_user(uid: int, req: AdminUpdateUser, admin: dict = Depends(secu
 async def delete_user(uid: int, admin: dict = Depends(security.require_admin)):
     if uid == admin["id"]:
         raise HTTPException(400, "不能删除自己")
-    if not db.delete_user(uid):
+    target = db.get_user_by_id(uid)
+    if not target:
         raise HTTPException(404, "用户不存在")
+    if target["role"] == "admin":
+        raise HTTPException(400, "管理员账户不允许删除（如需删除，请先将其角色改为普通用户）")
+    db.delete_user(uid)
     return {"deleted": uid}
 
 

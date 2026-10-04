@@ -280,7 +280,9 @@ async function loadUsers(){
       <td>
         <button class="btn mini" onclick='editUser(${JSON.stringify(u).replace(/'/g,"&#39;")})'>编辑</button>
         <button class="btn mini" onclick="resetPwd(${u.id},'${esc(u.username)}')">重置密码</button>
-        <button class="btn mini danger" onclick="delUser(${u.id},'${esc(u.username)}')">删除</button>
+        ${u.role==='admin'
+          ? '<button class="btn mini" disabled title="管理员账户不可删除">删除</button>'
+          : `<button class="btn mini danger" onclick="delUser(${u.id},'${esc(u.username)}')">删除</button>`}
       </td>
     </tr>`).join('') || '<tr><td colspan="10" class="empty">没有匹配的用户</td></tr>';
   renderPager('#userPager', d, uPage, p => { uPage = p; loadUsers(); });

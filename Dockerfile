@@ -22,11 +22,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 业务代码与数据
+# 业务代码与数据（alembic.ini 与 alembic/ 必须分开 COPY，合写会把目录拍平进 /app）
 COPY app/ ./app/
 COPY scripts/ ./scripts/
 COPY data/ ./data/
-COPY alembic.ini alembic/ ./
+COPY alembic.ini ./
+COPY alembic/ ./alembic/
 RUN mkdir -p /app/index
 
 # 前端构建产物（无 Node 环境启动时会回退 app/web 旧静态页）

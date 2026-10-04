@@ -21,6 +21,7 @@ from sqlalchemy import (
     create_engine, func, select, text, update,
 )
 from sqlalchemy.engine import Engine
+from sqlalchemy.dialects.mysql import MEDIUMTEXT
 from sqlalchemy.orm import (
     DeclarativeBase, Mapped, Session, mapped_column, sessionmaker,
 )
@@ -72,7 +73,8 @@ class ChatMessage(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     session_id: Mapped[str] = mapped_column(String(40), ForeignKey("chat_sessions.session_id"), nullable=False)
     role: Mapped[str] = mapped_column(String(16), nullable=False)
-    content: Mapped[str] = mapped_column(Text().with_variant(String(60000), "mysql"), nullable=False)
+    # MySQL utf8mb4 下 VARCHAR 上限 16383 字符，长对话正文用 MEDIUMTEXT（16MB）
+    content: Mapped[str] = mapped_column(Text().with_variant(MEDIUMTEXT(), "mysql"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
     __table_args__ = (Index("idx_session", "session_id"),)
 

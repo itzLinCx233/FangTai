@@ -6,6 +6,7 @@
 """
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import mysql
 
 revision = "0001_initial"
 down_revision = None
@@ -49,7 +50,7 @@ def upgrade() -> None:
         sa.Column("id", sa.BigInteger(), autoincrement=True, nullable=False),
         sa.Column("session_id", sa.String(40), nullable=False),
         sa.Column("role", sa.String(16), nullable=False),
-        sa.Column("content", sa.Text().with_variant(sa.String(60000), "mysql"), nullable=False),
+        sa.Column("content", sa.Text().with_variant(mysql.MEDIUMTEXT(), "mysql"), nullable=False),
         sa.Column("created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
         sa.ForeignKeyConstraint(["session_id"], ["chat_sessions.session_id"]),
         sa.PrimaryKeyConstraint("id"),

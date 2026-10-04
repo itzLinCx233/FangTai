@@ -20,6 +20,7 @@
 - 多轮动态交互：约束追加、局部替换、方案否定、模糊追问澄清、需求矛盾折中、上下文不遗忘
 - SSE 流式 API + Web 聊天界面 + Docker 一键部署（云端 RAG 零 GPU；可切本地 GPU 模式）
 - 用户系统：MySQL 管理（注册/登录/个人中心/健康档案绑定），管理员后台 `/admin` 增删改查
+- 工程化：前端 Vue3+Vite+TS（Element Plus 后台），后端 SQLAlchemy 2.0 ORM + Alembic 迁移
 
 ## 快速开始
 

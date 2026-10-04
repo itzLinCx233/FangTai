@@ -23,3 +23,5 @@ index/
 
 # 本地 API 密钥（不入库）
 scripts/.keys.env
+# 前端
+frontend/node_modules/

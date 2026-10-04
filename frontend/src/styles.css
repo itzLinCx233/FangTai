@@ -1,0 +1,22 @@
+/* 全局基础样式（沿用原页面配色） */
+:root {
+  --bg: #f6f7f9; --card: #ffffff; --primary: #0f6f5c; --primary-light: #e6f2ef;
+  --accent: #e8a33d; --text: #2a2f36; --muted: #8a929c; --border: #e5e8ec;
+  --danger: #c0483f;
+}
+* { box-sizing: border-box; margin: 0; padding: 0 }
+html, body, #app { height: 100% }
+body {
+  font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  background: var(--bg); color: var(--text);
+}
+
+/* 通用按钮（聊天页自绘风格；管理后台用 Element Plus） */
+.btn {
+  padding: 7px 14px; border: 1px solid var(--border); border-radius: 8px;
+  background: #fff; cursor: pointer; font-size: 13px; color: var(--text);
+}
+.btn:hover { background: var(--primary-light); border-color: var(--primary) }
+.btn.primary { background: var(--primary); color: #fff; border-color: var(--primary) }
+.btn.primary:hover { background: #0c5c4c }
+.btn:disabled { opacity: .5; cursor: not-allowed }

@@ -10,8 +10,7 @@
       <div class="spacer"></div>
       <div class="controls">
         <button class="btn" @click="newChat">新对话</button>
-        <template v-if="auth.isLoggedIn">
-          <div class="user-box">
+        <div class="user-box">
             <div class="avatar" :class="{ admin: auth.isAdmin }" @click="menuOpen = !menuOpen">
               {{ avatarChar }}
             </div>
@@ -23,8 +22,6 @@
               <a class="logout" @click="doLogout">退出登录</a>
             </div>
           </div>
-        </template>
-        <button v-else class="btn primary" @click="authMask = true">登录 / 注册</button>
       </div>
     </header>
 
@@ -32,7 +29,7 @@
     <main ref="chatMain">
       <div class="welcome" v-if="items.length === 0">
         <h2>您好，我是您的健康膳食助手 🥗</h2>
-        <p>告诉我吃什么、几个人吃、有什么忌口，我来为您规划一餐<br>登录后可在个人中心绑定健康档案，推荐自动规避过敏原与慢病忌口</p>
+        <p>告诉我吃什么、几个人吃、有什么忌口，我来为您规划一餐<br>可在个人中心设置同餐人健康档案，推荐自动规避过敏原与慢病忌口</p>
       </div>
       <template v-for="(it, i) in items" :key="i">
         <div v-if="it.type === 'msg'" class="msg" :class="it.role">
@@ -80,38 +77,6 @@
       <div class="stats">{{ statsLine }}</div>
     </footer>
 
-    <!-- 登录/注册模态框 -->
-    <div class="modal-mask" v-if="authMask" @click.self="authMask = false">
-      <div class="modal">
-        <div class="modal-head"><h3>账号</h3><button class="close-x" @click="authMask = false">×</button></div>
-        <div class="modal-body">
-          <div class="tabs">
-            <div :class="{ on: tab === 'login' }" @click="tab = 'login'">登录</div>
-            <div :class="{ on: tab === 'reg' }" @click="tab = 'reg'">注册</div>
-          </div>
-          <div class="err">{{ authErr }}</div>
-          <template v-if="tab === 'login'">
-            <div class="form-item"><label>用户名</label><input v-model="li.user" placeholder="用户名"></div>
-            <div class="form-item"><label>密码</label><input v-model="li.pass" type="password" placeholder="密码"></div>
-            <button class="btn primary wide-btn" @click="doLogin">登 录</button>
-          </template>
-          <template v-else>
-            <div class="form-item"><label>用户名</label><input v-model="rg.user" placeholder="3-32位，字母/数字/下划线/中文"></div>
-            <div class="form-item"><label>昵称</label><input v-model="rg.nick" placeholder="怎么称呼您（可空）"></div>
-            <div class="form-item"><label>密码</label><input v-model="rg.pass" type="password" placeholder="至少6位"></div>
-            <div class="form-item"><label>绑定健康档案</label>
-              <select v-model="rg.profile">
-                <option value="">暂不绑定</option>
-                <option v-for="p in profiles" :key="p.id" :value="p.id">{{ profileLabel(p) }}</option>
-              </select>
-              <div class="hint">推荐将自动规避该档案的过敏原与慢病忌口，可稍后在个人中心修改</div>
-            </div>
-            <button class="btn primary wide-btn" @click="doRegister">注 册</button>
-          </template>
-        </div>
-      </div>
-    </div>
-
     <!-- 个人中心模态框 -->
     <div class="modal-mask" v-if="ucMask" @click.self="ucMask = false">
       <div class="modal wide">
@@ -123,18 +88,11 @@
           </div>
           <div class="uc-section"><h4>👤 资料设置</h4>
             <div class="form-item"><label>昵称</label><input v-model="uc.nick"></div>
-            <div class="form-item"><label>我的健康档案</label>
-              <select v-model="uc.profile">
-                <option value="">暂不绑定</option>
-                <option v-for="p in profiles" :key="p.id" :value="p.id">{{ profileLabel(p) }}</option>
-              </select>
-              <div class="hint">对话推荐将自动应用该档案的过敏/忌口/健康需求约束</div>
-            </div>
             <div class="form-item"><label>同餐人档案（多人宴请，可多选）</label>
               <select v-model="uc.companions" multiple>
                 <option v-for="p in profiles" :key="p.id" :value="p.id">{{ profileLabel(p) }}</option>
               </select>
-              <div class="hint">选择与您一起吃饭的人的健康档案，整桌菜将同时满足所有人约束</div>
+              <div class="hint">推荐将同时满足所选档案的过敏/忌口/健康需求约束</div>
             </div>
             <button class="btn primary" @click="saveProfile">保存资料</button>
           </div>
@@ -261,44 +219,16 @@ async function send() {
 
 function newChat() { sessionId.value = null; items.value = []; statsLine.value = '' }
 
-/* ---------- 登录 / 注册 ---------- */
-const authMask = ref(false)
-const tab = ref<'login' | 'reg'>('login')
-const authErr = ref('')
-const li = ref({ user: '', pass: '' })
-const rg = ref({ user: '', nick: '', pass: '', profile: '' })
-
-async function doLogin() {
-  authErr.value = ''
-  try {
-    const u = await auth.login(li.value.user.trim(), li.value.pass)
-    authMask.value = false
-    pushSystem('已登录：' + (u.nickname || u.username) +
-      (u.health_profile_id ? '，健康档案约束已生效' : '，可在个人中心绑定健康档案'))
-  } catch (e: any) { authErr.value = e.message }
-}
-async function doRegister() {
-  authErr.value = ''
-  try {
-    const u = await auth.register({
-      username: rg.value.user.trim(), password: rg.value.pass,
-      nickname: rg.value.nick.trim(),
-      health_profile_id: rg.value.profile ? parseInt(rg.value.profile) : null,
-    })
-    authMask.value = false
-    pushSystem('注册成功，欢迎 ' + (u.nickname || u.username) + '！')
-  } catch (e: any) { authErr.value = e.message }
-}
 function doLogout() {
   menuOpen.value = false
   auth.logout()
-  pushSystem('已退出登录（匿名模式仍可继续使用）')
+  router.push('/login')
 }
 function goAdmin() { menuOpen.value = false; router.push('/admin') }
 
 /* ---------- 个人中心 ---------- */
 const ucMask = ref(false)
-const uc = ref({ nick: '', profile: '', companions: [] as number[] })
+const uc = ref({ nick: '', companions: [] as number[] })
 const pw = ref({ old: '', new: '' })
 const ucSessions = ref<any[]>([])
 const sessionView = ref<any[]>([])
@@ -307,7 +237,6 @@ async function openCenter() {
   menuOpen.value = false
   const u = auth.user!
   uc.value.nick = u.nickname || ''
-  uc.value.profile = u.health_profile_id ? String(u.health_profile_id) : ''
   uc.value.companions = [...companions.value]
   ucSessions.value = []
   sessionView.value = []
@@ -323,10 +252,7 @@ async function saveProfile() {
   localStorage.setItem('ft_companions', JSON.stringify(companions.value))
   await api('/api/auth/profile', {
     method: 'PUT',
-    body: JSON.stringify({
-      nickname: uc.value.nick,
-      health_profile_id: uc.value.profile ? parseInt(uc.value.profile) : null,
-    }),
+    body: JSON.stringify({ nickname: uc.value.nick }),
   })
   await auth.refresh()
   ucMask.value = false

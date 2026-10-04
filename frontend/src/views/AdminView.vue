@@ -5,7 +5,7 @@
       <h2>需要管理员登录</h2>
       <p>{{ gateMsg }}</p>
       <el-form label-position="top" @submit.prevent>
-        <el-form-item label="用户名"><el-input v-model="gUser" /></el-form-item>
+        <el-form-item label="账号"><el-input v-model="gUser" /></el-form-item>
         <el-form-item label="密码"><el-input v-model="gPass" type="password" show-password /></el-form-item>
       </el-form>
       <el-alert v-if="gErr" :title="gErr" type="error" :closable="false" style="margin-bottom: 12px" />
@@ -64,7 +64,7 @@
         <section v-show="view === 'users'">
           <el-card shadow="never">
             <div class="toolbar">
-              <el-input v-model="uSearch" placeholder="搜索用户名 / 昵称…" style="width: 300px" clearable
+              <el-input v-model="uSearch" placeholder="搜索账号 / 昵称…" style="width: 300px" clearable
                         @keyup.enter="uPage = 1; loadUsers()" />
               <el-button @click="uPage = 1; loadUsers()">搜索</el-button>
               <span class="flex1"></span>
@@ -72,7 +72,7 @@
             </div>
             <el-table :data="uRows" size="small">
               <el-table-column prop="id" label="ID" width="55" />
-              <el-table-column prop="username" label="用户名" min-width="100">
+              <el-table-column prop="username" label="账号" min-width="100">
                 <template #default="{ row }"><b>{{ row.username }}</b></template>
               </el-table-column>
               <el-table-column prop="nickname" label="昵称" min-width="90" />
@@ -81,9 +81,6 @@
                   <el-tag :type="row.role === 'admin' ? 'warning' : 'success'" size="small">
                     {{ row.role === 'admin' ? '管理员' : '用户' }}</el-tag>
                 </template>
-              </el-table-column>
-              <el-table-column label="绑定档案" width="80">
-                <template #default="{ row }">{{ row.health_profile_id ? row.health_profile_id + '号' : '-' }}</template>
               </el-table-column>
               <el-table-column label="手机号" width="110">
                 <template #default="{ row }">{{ row.phone || '-' }}</template>
@@ -151,10 +148,10 @@
     <!-- 新增/编辑用户 -->
     <el-dialog v-model="umShow" :title="editingId == null ? '新增用户' : '编辑用户 #' + editingId" width="440px">
       <el-form label-width="90px">
-        <el-form-item label="用户名" v-if="editingId == null">
+        <el-form-item label="账号" v-if="editingId == null">
           <el-input v-model="um.username" placeholder="3-32位" />
         </el-form-item>
-        <el-form-item label="用户名" v-else>
+        <el-form-item label="账号" v-else>
           <el-input :model-value="um.username" disabled />
         </el-form-item>
         <el-form-item label="密码" v-if="editingId == null">
@@ -165,11 +162,6 @@
           <el-select v-model="um.role" style="width: 100%">
             <el-option label="普通用户" value="user" />
             <el-option label="管理员" value="admin" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="健康档案">
-          <el-select v-model="um.profile" style="width: 100%" clearable placeholder="未绑定">
-            <el-option v-for="p in profiles" :key="p.id" :value="p.id" :label="profileLabel(p)" />
           </el-select>
         </el-form-item>
         <el-form-item label="手机号"><el-input v-model="um.phone" /></el-form-item>
@@ -199,7 +191,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { api, profileLabel, type Profile } from '../api'
+import { api } from '../api'
 import { useAuth } from '../stores/auth'
 
 const router = useRouter()
@@ -214,7 +206,6 @@ const gErr = ref('')
 const view = ref<'dash' | 'users' | 'sessions'>('dash')
 const viewTitle = computed(() => ({ dash: '仪表盘', users: '用户管理', sessions: '会话记录' }[view.value]))
 
-const profiles = ref<Profile[]>([])
 const statCards = ref<{ label: string; num: number; bg: string; color: string }[]>([])
 const recentUsers = ref<any[]>([])
 
@@ -267,18 +258,17 @@ async function loadUsers() {
 
 const umShow = ref(false)
 const editingId = ref<number | null>(null)
-const um = ref({ username: '', password: '', nickname: '', role: 'user', profile: null as number | null, phone: '', active: true })
+const um = ref({ username: '', password: '', nickname: '', role: 'user', phone: '', active: true })
 function openCreate() {
   editingId.value = null
-  um.value = { username: '', password: '', nickname: '', role: 'user', profile: null, phone: '', active: true }
+  um.value = { username: '', password: '', nickname: '', role: 'user', phone: '', active: true }
   umShow.value = true
 }
 function openEdit(row: any) {
   editingId.value = row.id
   um.value = {
     username: row.username, password: '', nickname: row.nickname || '',
-    role: row.role, profile: row.health_profile_id || null,
-    phone: row.phone || '', active: !!row.is_active,
+    role: row.role, phone: row.phone || '', active: !!row.is_active,
   }
   umShow.value = true
 }
@@ -290,7 +280,7 @@ async function saveUser() {
         body: JSON.stringify({
           username: um.value.username.trim(), password: um.value.password,
           nickname: um.value.nickname.trim(), role: um.value.role,
-          health_profile_id: um.value.profile, phone: um.value.phone.trim() || null,
+          phone: um.value.phone.trim() || null,
         }),
       })
     } else {
@@ -298,8 +288,7 @@ async function saveUser() {
         method: 'PUT',
         body: JSON.stringify({
           nickname: um.value.nickname.trim(), role: um.value.role,
-          health_profile_id: um.value.profile, phone: um.value.phone.trim() || null,
-          is_active: um.value.active,
+          phone: um.value.phone.trim() || null, is_active: um.value.active,
         }),
       })
     }
@@ -346,10 +335,6 @@ onMounted(async () => {
   await auth.refresh()
   if (auth.isAdmin) { enter(); return }
   if (auth.isLoggedIn) gateMsg.value = '账户 ' + auth.user!.username + ' 不是管理员'
-  try {
-    const d = await fetch('/api/profiles?kind=simple').then(r => r.json())
-    profiles.value = d.items
-  } catch { /* ignore */ }
 })
 </script>
 

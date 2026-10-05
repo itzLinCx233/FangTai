@@ -17,11 +17,8 @@ export interface User {
   taboo: string | null
   height_cm: number | null
   weight_kg: number | null
-  taboo_options?: string[]
+  city: string | null
 }
-
-export const TABOO_OPTIONS = ['海鲜', '虾', '蟹', '鱼', '花生', '坚果', '牛奶', '鸡蛋',
-  '豆制品', '芒果', '酒精', '辣', '香菜', '内脏']
 
 export const useAuth = defineStore('auth', () => {
   const user = ref<User | null>(null)

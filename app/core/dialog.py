@@ -49,10 +49,27 @@ class TurnSlots:
     dish_count: int | None = None
     soup_needed: bool | None = None
     banned_add: list[str] = field(default_factory=list)   # 新增忌口（口味/食材）
+    banned_methods: list[str] = field(default_factory=list)  # 禁用烹饪方式（烤/炸…）
     taste_add: list[str] = field(default_factory=list)    # 口味要求（正向）
     keywords: list[str] = field(default_factory=list)     # 主题关键词（面/鱼/清淡...）
     ambiguous: bool = False                               # 需主动澄清
     clarify_question: str = ""
+
+
+# 设备缺失 → 禁用烹饪方式（菜谱无空气炸锅标注；烤箱类 = 烤方式 + 步骤含"烤箱"）
+_EQUIP_METHOD = {"烤箱": "烤", "空气炸锅": "炸", "炸锅": "炸", "微波炉": None}
+
+
+def method_violations(rec: Recipe, banned_methods: list[str]) -> list[str]:
+    """菜谱命中的禁用烹饪方式（设备限制：候选过滤与方案校验共用）。"""
+    hits: list[str] = []
+    for m in banned_methods:
+        if m == "烤":
+            if rec.category["cook_method"] == "烤" or any("烤箱" in s for s in rec.steps[:4]):
+                hits.append(m)
+        elif rec.category["cook_method"] == m:
+            hits.append(m)
+    return hits
 
 
 # 口味正/反向词（"别做辣的"→banned 辣；"想吃辣"→taste 辣）
@@ -92,7 +109,8 @@ def rule_slots(message: str) -> TurnSlots:
             else:
                 s.time_limit_min = int(float(num))
     m3 = _DISH_COUNT_PAT.search(msg)
-    if m3:
+    # 加菜语境（"再加一道汤"）里的数量是增量，不是总菜数，不设置 dish_count
+    if m3 and not re.search(r"再|加|添|多", msg[max(0, m3.start() - 3):m3.start()]):
         val = m3.group(1)
         s.dish_count = COUNT_CN.get(val) or (int(val) if val.isdigit() else None)
     if _SOUP_PAT.search(msg):
@@ -113,6 +131,20 @@ def rule_slots(message: str) -> TurnSlots:
         kw = kw.strip()
         if kw and len(kw) <= 4:
             s.banned_add.append(kw)
+    # 设备限制："家里没有烤箱/空气炸锅坏了" → 禁用对应烹饪方式
+    for eq, method in _EQUIP_METHOD.items():
+        if eq in msg:
+            i = msg.find(eq)
+            if re.search(r"没有?|无|坏了|不在|不太", msg[max(0, i - 8):i]):
+                if method and method not in s.banned_methods:
+                    s.banned_methods.append(method)
+    # 明确禁用的烹饪方式："别用烤的/不要油炸"
+    for m in ("烤", "炸", "煎"):
+        if m in msg:
+            i = msg.find(m)
+            if _NEG_PAT.search(msg[max(0, i - 6):i + 1]):
+                if m not in s.banned_methods:
+                    s.banned_methods.append(m)
     # 主题关键词
     for kw in ["面", "米饭", "粥", "汤", "鱼", "虾", "鸡", "牛肉", "素食", "减脂餐", "便当", "烘焙"]:
         if kw in msg:
@@ -142,6 +174,7 @@ async def extract_slots(message: str, history_summary: str, llm,
  "people":数字或null, "time_limit_min":数字或null,
  "dish_count":数字或null, "soup_needed":true/false/null,
  "banned_add":["新增忌口的口味或食材"],"taste_add":["想要的口味"],
+ "banned_methods":["禁用的烹饪方式（如家里没烤箱→[\"烤\"]，没空气炸锅→[\"炸\"]）"],
  "keywords":["主题关键词如 面/鱼/减脂餐"],"ambiguous":true/false,
  "clarify_question":"ambiguous时给出一句澄清问话，否则空串"}
 规则：
@@ -149,6 +182,7 @@ async def extract_slots(message: str, history_summary: str, llm,
 - "替换某道菜"=replace_dish；"整个方案都不要"=reject_all；"多个人聚餐/宴请"=banquet
 - 在上一轮方案上追加限制（含多人口味冲突/矛盾需求）=add_constraint；全新需求=new_request
 - 用户需求模糊（如"有仪式感""清爽"但无具体方向）时 ambiguous=true 并构造澄清问题
+- dish_count 是整餐总菜数；"再加一道汤/添两个菜"这类增量加菜请求不要设置 dish_count
 - banned_add 只放用户明确不想要的（"别辣"→["辣"]），不要臆测"""
     try:
         import json as _json
@@ -171,6 +205,8 @@ async def extract_slots(message: str, history_summary: str, llm,
                 dish_count=clean(data.get("dish_count")) or base.dish_count,
                 soup_needed=data.get("soup_needed") if data.get("soup_needed") is not None else base.soup_needed,
                 banned_add=list(set(base.banned_add + (data.get("banned_add") or []))),
+                banned_methods=list(set(
+                    base.banned_methods + (data.get("banned_methods") or []))),
                 taste_add=list(set(base.taste_add + (data.get("taste_add") or []))),
                 keywords=list(set(base.keywords + (data.get("keywords") or []))),
                 ambiguous=bool(data.get("ambiguous")),
@@ -203,6 +239,8 @@ class DialogSession:
     people: int = 2
     time_limit_min: int | None = None
     dish_count: int | None = None
+    banned_methods: list[str] = field(default_factory=list)  # 禁用烹饪方式（设备限制）
+    served_ids: set[int] = field(default_factory=set)      # 本会话历轮推荐过的菜（换桌不回头）
     created_at: float = field(default_factory=time.time)
     updated_at: float = field(default_factory=time.time)
 
@@ -247,6 +285,10 @@ class DialogSession:
             self.dish_count = slots.dish_count
         if slots.banned_add:
             self.constraints.add_banned([b for b in slots.banned_add if b])
+        if slots.banned_methods:
+            for m in slots.banned_methods:
+                if m not in self.banned_methods:
+                    self.banned_methods.append(m)
         if slots.taste_add:
             conflicted = set(slots.banned_add)
             for t in slots.taste_add:
@@ -266,13 +308,19 @@ class DialogSession:
             filt["餐次"] = [self.meal]
         return filt
 
+    def record_served(self):
+        """本轮方案确定后记录已推荐菜品（跨轮去重：reject_all 换桌也不吃回头菜）。"""
+        self.served_ids |= {d.recipe_id for d in self.current_plan}
+
     def violating_dishes(self) -> list[DishPlanItem]:
-        """当前方案中违反最新约束的菜品（过敏/忌口/时间限制），将被替换；其余保留。"""
+        """当前方案中违反最新约束的菜品（过敏/忌口/设备/时间限制），将被替换；其余保留。"""
         from app.core.recipe_store import get_store, estimate_minutes
         out = []
         for d in self.current_plan:
             rec = get_store().get(d.recipe_id)
             if rec is None or not self.constraints.ok(rec):
+                out.append(d)
+            elif self.banned_methods and method_violations(rec, self.banned_methods):
                 out.append(d)
             elif self.time_limit_min and estimate_minutes(rec) > self.time_limit_min:
                 out.append(d)

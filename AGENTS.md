@@ -13,7 +13,7 @@
 - `frontend/` — Vue3 + Vite + TS + Element Plus + Pinia；`dist/` 为构建产物（由后端托管）
 - `app/web/` — 旧版单文件静态页（回退用，勿再新增功能）
 - `data/` — 运行数据副本；`资料/` — 赛题细则（docx）与原始数据（只读，勿改）
-- `docs/` — 技术方案、部署文档；改检索/约束/编排前先读 `docs/技术方案文档.md`
+- `docs/` — 技术方案、部署、测试文档；改检索/约束/编排前先读 `docs/技术方案文档.md`，测试脚本用法见 `docs/测试说明.md`
 
 ## 常用命令（Linux；仓库注释里的 `py -3`/`set` 是 Windows 写法）
 
@@ -23,7 +23,8 @@ python -m uvicorn app.main:app --port 8000        # 本地起服务（无 MySQL 
 docker compose up -d --build                      # Docker 一键部署（含 MySQL 8.4；首启自动建库/建表/建管理员）
 
 python -m pytest tests/ -v                        # 单元测试（也可直接 python tests/test_core.py）
-python scripts/eval.py --api http://127.0.0.1:8000    # 20 组对话用例全量评测
+python scripts/eval.py --mode func --out eval_func.json   # 功能评测（跳过简单场景+冲突场景901-904）
+python scripts/eval.py --mode perf --out eval_perf.json   # 性能评测（全量29轮计时，thinking=disabled）
 python scripts/score_test.py --api http://127.0.0.1:8000  # 赛题评分表自测（100 分制）
 bash scripts/test_deepseek.sh                     # DeepSeek(deepseek-flash) 全量评测，数据取自 资料/
 python scripts/dev_run.py                         # 进程内调试单条对话（不走 HTTP）

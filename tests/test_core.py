@@ -136,6 +136,43 @@ def test_dialog_constraint_priority():
     print("test_dialog_constraint_priority ✓")
 
 
+def test_equipment_and_dedup():
+    store = get_store()
+    # 设备限制抽取："没有烤箱/空气炸锅" → 禁用对应烹饪方式
+    s1 = dlg.rule_slots("安排两人晚餐，家里没有烤箱，也没有空气炸锅")
+    assert "烤" in s1.banned_methods and "炸" in s1.banned_methods
+    s2 = dlg.rule_slots("别用烤的方式做")
+    assert "烤" in s2.banned_methods
+    s3 = dlg.rule_slots("用烤箱烤个鸡翅吃")   # 正向提及设备不禁用
+    assert "烤" not in s3.banned_methods
+    # 方式违例判定：烤菜命中；非烤不命中；步骤含烤箱的非烤菜命中
+    baked = next(r for r in store.recipes if r.category["cook_method"] == "烤")
+    assert dlg.method_violations(baked, ["烤", "炸"]) == ["烤"]
+    steamed = next(r for r in store.recipes if r.category["cook_method"] == "蒸")
+    assert not dlg.method_violations(steamed, ["烤", "炸"])
+    oven_step = next(r for r in store.recipes
+                     if r.category["cook_method"] != "烤"
+                     and any("烤箱" in st for st in r.steps[:4]))
+    assert dlg.method_violations(oven_step, ["烤"]) == ["烤"]
+    # 会话累积 + 方案设备校验（violating_dishes 应含烤菜）
+    sess = dlg.DialogSession()
+    sess.apply_slots(s1)
+    assert sess.banned_methods == ["烤", "炸"]
+    sess.current_plan = [
+        dlg.DishPlanItem(recipe_id=baked.id, name=baked.name),
+        dlg.DishPlanItem(recipe_id=steamed.id, name=steamed.name),
+    ]
+    violating = sess.violating_dishes()
+    assert [d.recipe_id for d in violating] == [baked.id]
+    # 跨轮去重：record_served 累积历轮菜品，重复推荐可检出
+    sess.record_served()
+    assert sess.served_ids == {baked.id, steamed.id}
+    sess.current_plan = [dlg.DishPlanItem(recipe_id=baked.id, name=baked.name)]
+    sess.record_served()
+    assert sess.served_ids == {baked.id, steamed.id}
+    print("test_equipment_and_dedup ✓")
+
+
 if __name__ == "__main__":
     test_recipe_store()
     test_constraint_engine()
@@ -144,4 +181,5 @@ if __name__ == "__main__":
     test_dialog_rules()
     test_estimate_minutes()
     test_dialog_constraint_priority()
+    test_equipment_and_dedup()
     print("\n全部通过 ✓")

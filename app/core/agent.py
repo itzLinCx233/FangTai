@@ -31,9 +31,21 @@ from app.core.retriever import get_retriever
 # ---------------------------------------------------------------- 候选构造
 def candidate_pool(session: dlg.DialogSession, query: str, need: int = 24,
                    use_label_filter: bool = True) -> list[Recipe]:
-    """约束过滤 + 混合检索 → 候选菜谱池（口味为软加权，餐次为硬过滤可放宽）。"""
+    """约束过滤 + 混合检索 → 候选菜谱池（口味为软加权，餐次为硬过滤可放宽）。
+
+    设备限制（无烤箱/炸锅）与跨轮去重（历轮已推荐过的菜不再入选，
+    reject_all 换桌同样不吃回头菜）在 ok_ids 阶段排除；历史菜品排除后
+    候选枯竭时放宽（约束安全性优先于去重体验）。
+    """
     store = get_store()
     ok_ids = store.filter_ids(session.constraints.banned_pattern)
+    if session.banned_methods:
+        ok_ids = {rid for rid in ok_ids
+                  if not dlg.method_violations(store.by_id[rid], session.banned_methods)}
+    if session.served_ids:
+        fresh = ok_ids - session.served_ids
+        if len(fresh) >= max(8, need):
+            ok_ids = fresh
     label_filter = session.label_filter() if use_label_filter else {}
     if label_filter:
         # 标签过滤后候选不足时逐级放宽（先放宽餐次）
@@ -262,9 +274,11 @@ class MealAgent:
                 and re.search(r"再来[一2两1]?[点道个份]|再添|再加[一1两2]?[道个份]|"
                               r"加[一1两2]?[道个份](?!油|盐|糖|水)|添[一1两2]?[道个份]|多[加来][一1两2]?[道个份]", message)):
             slots.intent = "add_dish"
+            # 加菜轮同时提了新约束（如"家里没烤箱"）→ 不合规旧菜同样替换
+            replace_targets = session.violating_dishes()
             for d in session.current_plan:
-                d.locked = True
-            kept_ids = {d.recipe_id for d in session.current_plan}
+                d.locked = d.recipe_id not in {x.recipe_id for x in replace_targets}
+            kept_ids = {d.recipe_id for d in session.current_plan if d.locked}
 
         if slots.intent in ("add_constraint", "replace_dish") and session.current_plan:
             # 最小化修改：只替换违规/被点名/与本轮新需求冲突的菜品，其余锁定
@@ -367,6 +381,10 @@ class MealAgent:
         else:
             pool = await pool_task
             pool = filter_by_meal(pool, session.meal, need_count + 8)
+        # 粗检索与槽位抽取并行，本轮新提的设备限制未进检索过滤 → 池口统一补滤
+        if session.banned_methods:
+            pool = [r for r in pool
+                    if not dlg.method_violations(r, session.banned_methods)] or pool
         if replace_targets:
             soup_needed = None  # 替换模式不强制汤
         elif slots.intent == "add_dish":
@@ -407,6 +425,8 @@ class MealAgent:
             session.current_plan = kept_items
         else:
             session.current_plan = new_items
+        # 跨轮去重：本轮方案入账，后续（含 reject_all 换桌）不再重复推荐
+        session.record_served()
 
         # 6) 营养 + 结构化方案事件（评测/UI 消费）
         nutri, balance = plan_nutrition(session)

@@ -47,6 +47,11 @@ RECALL_TOPK = int(os.getenv("RECALL_TOPK", "60"))       # 混合召回条数
 RERANK_TOPK = int(os.getenv("RERANK_TOPK", "20"))       # 重排后送入 LLM 的候选数
 FINAL_CANDIDATES = int(os.getenv("FINAL_CANDIDATES", "12"))  # 注入 prompt 的最终候选数
 
+# ---------------- 多样性（输出菜品重复度治理） ----------------
+# 开启后对检索头部候选做受控扰动，降低多轮/多会话推荐重复率；评测需可复现时设 false
+RECIPE_DIVERSITY = os.getenv("RECIPE_DIVERSITY", "true").lower() in ("1", "true", "yes", "on")
+RECIPE_JITTER_TOPN = int(os.getenv("RECIPE_JITTER_TOPN", "20"))  # 参与扰动的头部候选条数
+
 # ---------------- 服务 ----------------
 HOST = os.getenv("HOST", "0.0.0.0")
 PORT = int(os.getenv("PORT", "8000"))

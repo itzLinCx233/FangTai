@@ -102,14 +102,32 @@ SELECT_SYS = """你是膳食选菜引擎。只允许从候选列表中选菜，�
 
 async def llm_select(
     session: dlg.DialogSession, msg: str, pool: list[Recipe], dish_count: int,
-    soup_needed: bool | None,
+    soup_needed: bool | None, avoid_ids: set[int] | None = None,
+    avoid_hard: bool = False,
 ) -> list[tuple[Recipe, str]]:
-    """LLM 从候选池选菜；返回 [(recipe, reason)]。失败/违规时回退规则组合。"""
+    """LLM 从候选池选菜；返回 [(recipe, reason)]。失败/违规时回退规则组合。
+
+    avoid_ids（重复度治理）：上一轮已推荐菜品。软回避=在池中沉底（LLM 优先选其他），
+    硬回避=直接剔除（用户明确要求不重复）；剔空则放弃回避保兜底。
+    """
     llm = get_llm()
+    pool = list(pool)
+    avoid_names = ""
+    if avoid_ids:
+        by_id = {r.id: r for r in pool}
+        avoid_names = "、".join(by_id[i].name for i in avoid_ids if i in by_id)[:150]
+        if avoid_hard:
+            kept = [r for r in pool if r.id not in avoid_ids]
+            pool = kept or pool
+        else:
+            pool.sort(key=lambda r: r.id in avoid_ids)  # 稳定排序：回避菜沉底
     lines = [r.brief() for r in pool[: config.FINAL_CANDIDATES + 8]]
     task_lines = [f"任务：为{session.meal or '一餐'}（{session.people}人）选 {dish_count} 道菜"]
     if soup_needed:
         task_lines.append("其中应包含 1 道汤")
+    if avoid_names:
+        mode_txt = "已从候选剔除，不得推荐" if avoid_hard else "排在候选末尾，除非用户本轮点名否则勿选"
+        task_lines.append(f"重复度控制：{avoid_names} 此前已推荐过（{mode_txt}）")
     profile_lines = []
     for pid in session.profile_ids:
         p = get_profile(pid)
@@ -119,7 +137,7 @@ async def llm_select(
         "\n用餐人档案：\n" + "\n".join(profile_lines) if profile_lines else ""
     ) + f"\n本轮需求：{msg}\n候选列表：\n" + "\n".join(lines)
     try:
-        raw = await llm.chat_fast([llm.system(SELECT_SYS), llm.user(prompt)])
+        raw = await llm.chat_fast([llm.system(SELECT_SYS), llm.user(prompt)], temperature=0.6)
         start, end = raw.find("{"), raw.rfind("}")
         data = json.loads(raw[start:end + 1])
         picked: list[tuple[Recipe, str]] = []
@@ -288,6 +306,16 @@ class MealAgent:
                 d.locked = True
             kept_ids = {d.recipe_id for d in session.current_plan}
 
+        # 3.2) 重复度治理：全新推荐轮回避上一轮菜品（须在 reject_all 清空方案前取）
+        avoid_ids: set[int] = set()
+        avoid_hard = bool(re.search(
+            r"换一?(批|波|组|套|桌|些)|换换口味?|来点不一样的?|重(新)?(推荐|来|安排)|"
+            r"不要(和|跟)?(上次|之前|刚才|原来)(一样|重复)|别(再|老)重复", message))
+        if slots.intent in ("new_request", "banquet", "reject_all") and session.current_plan:
+            # 用户本轮点名提到的菜不回避（如"还是想吃红烧排骨，重新配一套"）
+            avoid_ids = {d.recipe_id for d in session.current_plan
+                         if d.name[:2] not in message}
+
         if slots.intent in ("add_constraint", "replace_dish") and session.current_plan:
             # 最小化修改：只替换违规/被点名菜品，其余锁定
             replace_targets = session.violating_dishes()
@@ -361,7 +389,8 @@ class MealAgent:
             soup_needed = True if dlg.rule_slots(message).soup_needed else None
         else:
             soup_needed = True if (session.meal or "晚餐") in ("午餐", "晚餐") else False
-        picked = await llm_select(session, message, pool, need_count, soup_needed)
+        picked = await llm_select(session, message, pool, need_count, soup_needed,
+                                  avoid_ids=avoid_ids or None, avoid_hard=avoid_hard)
         new_items = finalize_plan(session, picked, need_count, soup_needed, pool=pool)
 
         # 5) 合入会话方案（保留 locked；新菜去重合入，数量缺口从池中补位）

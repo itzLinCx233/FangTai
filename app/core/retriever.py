@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import json
+import random
 import threading
 import time
 from dataclasses import dataclass
@@ -396,10 +397,28 @@ class RecipeRetriever:
             if r.recipe.name not in seen_names:
                 seen_names.add(r.recipe.name)
                 deduped.append(r)
-        results = deduped
+        results = self._diversify(deduped)
 
         self.last_latency_ms = (time.perf_counter() - t0) * 1000
         return results[:topk]
+
+    @staticmethod
+    def _diversify(results: list[RetrievedRecipe]) -> list[RetrievedRecipe]:
+        """重复度治理：对头部候选做受控扰动（仅交换分数相近的相邻项）。
+
+        同样的查询多轮检索不再总落在同一批菜上；只扰动分差 ≤15% 的相邻对，
+        不破坏相关性大局。评测需可复现时设 RECIPE_DIVERSITY=false 关闭。
+        """
+        if not config.RECIPE_DIVERSITY or len(results) < 4:
+            return results
+        out = list(results)
+        topn = min(config.RECIPE_JITTER_TOPN, len(out) - 1)
+        for i in range(topn):
+            a, b = out[i], out[i + 1]
+            base = max(abs(a.score), 1e-9)
+            if abs(a.score - b.score) <= base * 0.15 and random.random() < 0.5:
+                out[i], out[i + 1] = b, a
+        return out
 
 
 _retriever: RecipeRetriever | None = None

@@ -41,7 +41,7 @@
           <div class="bubble system">{{ it.text }}</div>
         </div>
         <div v-else-if="it.type === 'plan'" class="plan-card">
-          <h4>📋 本餐方案 · {{ it.plan.people || 2 }}人 · 忌口：{{ (it.plan.taboos || []).join('、') || '无' }}</h4>
+          <h4>📋 本餐方案 · 忌口：{{ (it.plan.taboos || []).join('、') || '无' }}</h4>
           <div class="dishes">
             <div class="dish" v-for="d in sortDishes(it.plan.dishes)" :key="d.id"
                  :class="{ link: d.detail }" @click="openDish(d)">

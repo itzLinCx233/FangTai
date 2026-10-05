@@ -26,13 +26,74 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app import config  # noqa: E402
 from app.core import dialog as dlg  # noqa: E402
-from app.core.constraint_engine import ProfileConstraints  # noqa: E402
+from app.core.constraint_engine import ProfileConstraints, TASTE_PREF_MAP  # noqa: E402
 from app.core.profiles import load_profiles, get_profile  # noqa: E402
 from app.core.recipe_store import get_store  # noqa: E402
 
 # 档位阈值
 EXCELLENT = {"first_token": 2.0, "turn_e2e": 8.0, "multi_avg": 6.0}
 PASS = {"first_token": 5.0, "turn_e2e": 15.0, "multi_avg": 12.0}
+
+# ---------------------------------------------------------------- 冲突场景（对话追加约束 vs 档案人设）
+# 验证优先级：对话最新追加的口味/忌口 覆盖 档案口味偏好与先前会话忌口；
+# 档案过敏/疾病忌口属健康安全约束，任何情况下不得被对话解除（赛题零违反口径）。
+CONFLICT_CASES = [
+    {"id": 901, "note": "档案口味清淡 vs 对话要辣",
+     "profile_id": 3,    # user3：高血压高血糖、花生过敏、口味清淡（疾病忌口不拦辣）
+     "user_messages": ["帮我想顿晚饭。", "今天想换换口味，来点辣的。"],
+     "expect": "第2轮推荐应含辣菜（遵循对话而非档案'清淡'），且花生过敏零违反"},
+    {"id": 902, "note": "会话先禁辣 vs 后要辣（最新对话优先）",
+     "profile_id": 37,   # user37：备孕、鸡蛋过敏、口味中性
+     "user_messages": ["安排一顿晚饭，别做辣的。", "还是来点辣的吧，太清淡吃不惯。"],
+     "expect": "第2轮'辣'会话忌口应被解除并推荐辣菜，且鸡蛋过敏零违反"},
+]
+
+
+def track_session_constraints(session_banned: list[str], dialog_taste: str | None,
+                              msg: str) -> tuple[list[str], str | None]:
+    """按消息更新会话累积追加忌口与最新正向口味（纯规则，与 dialog.rule_slots 同源）。
+
+    冲突解决与 dialog.apply_slots 一致：本轮正向口味解除先前累积的同词忌口
+    （最新对话优先）；同轮既禁又要的词保守保留（多人口味分歧）。
+    """
+    slots = dlg.rule_slots(msg)
+    for b in slots.banned_add:
+        if b and b not in session_banned:
+            session_banned.append(b)
+    conflicted = set(slots.banned_add)
+    for t in slots.taste_add:
+        canon = TASTE_PREF_MAP.get(t, t)
+        if not canon:
+            continue
+        if t in session_banned and t not in conflicted:
+            session_banned.remove(t)
+        dialog_taste = canon
+        break
+    return session_banned, dialog_taste
+
+
+def effective_constraints(profile: dict, session_banned: list[str]) -> ProfileConstraints:
+    """有效校验约束 = 档案约束 + 会话累积追加忌口（过敏/疾病忌口天然保留自档案）。"""
+    eff = ProfileConstraints.from_profile(profile)
+    if session_banned:
+        eff.add_banned(session_banned)
+    return eff
+
+
+def taste_follow_check(plan_ev, dialog_taste, profile_taste, store) -> dict | None:
+    """对话口味与档案口味冲突时，检查本轮方案是否体现对话口味（而非档案口味）。"""
+    if not dialog_taste or dialog_taste == profile_taste:
+        return None
+    hit = False
+    for d in (plan_ev or {}).get("dishes", []):
+        rec = store.get(d["id"])
+        text = rec.name if rec else str(d.get("name", ""))
+        tags = set(rec.tags.get("口味", [])) if rec else set()
+        if any(dialog_taste in t for t in tags) or dialog_taste in text:
+            hit = True
+            break
+    return {"dialog_taste": dialog_taste, "profile_taste": profile_taste,
+            "followed": "dialog" if hit else "profile"}
 
 
 # ---------------------------------------------------------------- in-process 驱动
@@ -120,6 +181,8 @@ async def main():
     ap.add_argument("--case", type=int, default=0, help="只跑指定用例 id")
     ap.add_argument("--profile", type=int, default=0, help="固定档案 id（缺省按用例轮转）")
     ap.add_argument("--out", default="eval_report.json")
+    ap.add_argument("--skip-conflict", action="store_true",
+                    help="跳过内置冲突场景（对话追加约束 vs 档案人设）")
     args = ap.parse_args()
 
     sys.stdout.reconfigure(encoding="utf-8")
@@ -147,28 +210,43 @@ async def main():
     report_cases = []
     for case in cases:
         pid = args.profile or profile_cycle[(case["id"] - 1) % len(profile_cycle)]
-        constraints = ProfileConstraints.from_profile(profiles[pid])
+        profile = profiles[pid]
+        profile_taste = ProfileConstraints.from_profile(profile).taste_pref
         session = dlg.DialogSession()
         session.set_profiles([pid], get_profile)
         http_sid = None
         case_turns = []
+        session_banned: list[str] = []      # 会话累积追加忌口（含后续解除）
+        dialog_taste: str | None = None     # 最新正向口味（对话优先于档案）
         for i, msg in enumerate(case["user_messages"]):
+            session_banned, dialog_taste = track_session_constraints(
+                session_banned, dialog_taste, msg)
+            eff = effective_constraints(profile, session_banned)
             if args.api:
                 r, http_sid = await run_turn_http(
                     http_client, args.api, http_sid, msg, [pid])
             else:
                 r = await run_turn_inproc(agent, session, msg)
-            v = validate_plan(r["plan"], constraints, store)
+            v = validate_plan(r["plan"], eff, store)
             r["turn"] = i + 1
             r["profile_id"] = pid
             r["message"] = msg[:30]
+            r["session_banned"] = list(session_banned)
             r["validation"] = v
+            tc = taste_follow_check(r["plan"], dialog_taste, profile_taste, store)
+            if tc:
+                r["taste_conflict"] = tc
             case_turns.append(r)
             all_turns.append(r)
             status = "OK" if v["ok"] else "VIOLATION"
             ft = r["first_token_s"]
             print(f"  用例{case['id']}-轮{i+1} [{status}] 首Token={ft}s 总={r['total_s']}s "
                   f"菜品={v['dish_count']} 荤素比={(r['plan'] or {}).get('nutrition_per_person', {}).get('intake', {}).get('kcal', '-')}kcal/人")
+            if session_banned:
+                print(f"    会话忌口(累积): {session_banned}")
+            if tc:
+                print(f"    口味冲突: 对话要[{tc['dialog_taste']}] vs 档案[{tc['profile_taste']}] "
+                      f"→ 实际遵循: {tc['followed']}")
             if v["violations"]:
                 print(f"    !! 违反: {json.dumps(v['violations'], ensure_ascii=False)[:200]}")
             if v["hallucinated"]:
@@ -180,6 +258,50 @@ async def main():
                 "case_id": case["id"], "profile_id": pid,
                 "turns": case_turns, "case_avg_s": round(avg, 3),
             })
+
+    # ---------------- 冲突场景：对话追加约束 vs 档案人设 ----------------
+    conflict_results = []
+    if not args.skip_conflict:
+        print("\n冲突场景（对话追加约束 vs 档案人设，对话优先；过敏/疾病忌口不可解除）:")
+        for cc in CONFLICT_CASES:
+            pid = cc["profile_id"]
+            profile = profiles[pid]
+            profile_taste = ProfileConstraints.from_profile(profile).taste_pref
+            session = dlg.DialogSession()
+            session.set_profiles([pid], get_profile)
+            http_sid = None
+            session_banned, dialog_taste = [], None
+            turns = []
+            for i, msg in enumerate(cc["user_messages"]):
+                session_banned, dialog_taste = track_session_constraints(
+                    session_banned, dialog_taste, msg)
+                eff = effective_constraints(profile, session_banned)
+                if args.api:
+                    r, http_sid = await run_turn_http(
+                        http_client, args.api, http_sid, msg, [pid])
+                else:
+                    r = await run_turn_inproc(agent, session, msg)
+                v = validate_plan(r["plan"], eff, store)
+                tc = taste_follow_check(r["plan"], dialog_taste, profile_taste, store)
+                turns.append({
+                    "turn": i + 1, "message": msg[:40],
+                    "session_banned": list(session_banned),
+                    "dishes": [d["name"] for d in (r["plan"] or {}).get("dishes", [])],
+                    "validation": v, "taste_conflict": tc,
+                })
+            last = turns[-1]
+            followed = (last.get("taste_conflict") or {}).get("followed")
+            ok = followed == "dialog" and all(t["validation"]["ok"] for t in turns)
+            conflict_results.append({
+                "case_id": cc["id"], "note": cc["note"], "expect": cc["expect"],
+                "pass": ok, "turns": turns,
+            })
+            print(f"  冲突{cc['id']} [{cc['note']}] {'PASS' if ok else 'FAIL'} "
+                  f"(末轮遵循: {followed}, 零违反: {all(t['validation']['ok'] for t in turns)})")
+            for t in turns:
+                if not t["validation"]["ok"]:
+                    print(f"    !! 轮{t['turn']} 违反: "
+                          f"{json.dumps(t['validation']['violations'], ensure_ascii=False)[:200]}")
 
     # 汇总
     def agg(key):
@@ -193,8 +315,16 @@ async def main():
     first_tok = agg("first_token_s")
     e2e = agg("total_s")
     case_avgs = [c["case_avg_s"] for c in report_cases]
-    viol_total = sum(len(t["validation"]["violations"]) for t in all_turns)
+    profile_viol = 0      # 档案过敏/疾病忌口违反（赛题零违反口径）
+    session_viol = 0      # 会话追加忌口违反（多轮上下文一致性）
+    for t in all_turns:
+        for v in t["validation"]["violations"]:
+            if str(v.get("source", "")).startswith("会话忌口"):
+                session_viol += 1
+            else:
+                profile_viol += 1
     hallu_total = sum(len(t["validation"]["hallucinated"]) for t in all_turns)
+    tc_turns = [t["taste_conflict"] for t in all_turns if t.get("taste_conflict")]
 
     def grade(val, key):
         if val is None:
@@ -211,15 +341,26 @@ async def main():
         "turn_e2e_s": e2e, "turn_e2e_grade": grade(e2e["mean"], "turn_e2e"),
         "multi_avg_s": {"mean": round(statistics.mean(case_avgs), 3) if case_avgs else None},
         "multi_avg_grade": grade(statistics.mean(case_avgs) if case_avgs else None, "multi_avg"),
-        "allergen_violations": viol_total,
+        "allergen_violations": profile_viol,
+        "session_banned_violations": session_viol,
         "hallucinated_dishes": hallu_total,
         "zero_violation_pass_rate": round(
             sum(1 for t in all_turns if t["validation"]["ok"]) / len(all_turns) * 100, 1
         ) if all_turns else 0,
+        "session_constraint_checks": {
+            "turns_with_session_banned": sum(1 for t in all_turns if t.get("session_banned")),
+            "taste_conflict_turns": len(tc_turns),
+            "taste_followed_dialog": sum(1 for x in tc_turns if x["followed"] == "dialog"),
+        },
     }
     print("\n" + "=" * 60)
     print(json.dumps(summary, ensure_ascii=False, indent=2))
+    if conflict_results:
+        passed = sum(1 for c in conflict_results if c["pass"])
+        print(f"冲突场景: {passed}/{len(conflict_results)} 通过"
+              f"（对话追加约束优先于档案人设，过敏/疾病忌口不可解除）")
     out = {"summary": summary, "cases": report_cases,
+           "conflict_scenarios": conflict_results,
            "thresholds": {"excellent": EXCELLENT, "pass": PASS}}
     Path(args.out).write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"报告已写入 {args.out}")

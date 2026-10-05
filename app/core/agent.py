@@ -267,8 +267,25 @@ class MealAgent:
             kept_ids = {d.recipe_id for d in session.current_plan}
 
         if slots.intent in ("add_constraint", "replace_dish") and session.current_plan:
-            # 最小化修改：只替换违规/被点名菜品，其余锁定
+            # 最小化修改：只替换违规/被点名/与本轮新需求冲突的菜品，其余锁定
             replace_targets = session.violating_dishes()
+            # 需求冲突时本轮优先：本轮明确提出新口味/新餐次，与现有菜品标签不符的替换
+            new_tastes = {dlg.TASTE_PREF_MAP.get(t, t) for t in (slots.taste_add or []) if t}
+            for d in session.current_plan:
+                if d in replace_targets:
+                    continue
+                rec = store.get(d.recipe_id)
+                if rec is None:
+                    continue
+                if new_tastes:
+                    dish_tastes = set(rec.tags.get("口味", []))
+                    if dish_tastes and not (dish_tastes & new_tastes):
+                        replace_targets.append(d)
+                        continue
+                if slots.meal:
+                    dish_meals = rec.tags.get("餐次", [])
+                    if dish_meals and slots.meal not in dish_meals:
+                        replace_targets.append(d)
             if slots.intent == "replace_dish":
                 for d in session.current_plan:
                     if d.name[:2] in message or any(
@@ -295,6 +312,13 @@ class MealAgent:
                 need_count = min(session.dish_count - len(session.current_plan), need_count) or 1
 
         # 3.5) 约束追加但当前方案零违规：方案保持不变，直接确认（最小化修改）
+        # 菜数/人数缩减：先按最新要求裁剪现有方案（已确认菜品优先保留），再走确认流程
+        want_now = session.dish_count or planner.default_dish_count(
+            session.people, meal=session.meal)
+        oversized = len(session.current_plan) > want_now
+        if oversized and session.current_plan:
+            session.current_plan.sort(key=lambda d: not d.locked)
+            session.current_plan = session.current_plan[:want_now]
         if slots.intent == "add_constraint" and session.current_plan and not replace_targets:
             for d in session.current_plan:
                 d.locked = True
@@ -302,12 +326,14 @@ class MealAgent:
             nutri, balance = plan_nutrition(session)
             plan_payload = self._plan_payload(session, balance)
             yield emit({"type": "plan", **plan_payload})
-            preamble = self._preamble(session, slots, no_change=True)
+            preamble = self._preamble(session, slots, no_change=not oversized)
             for tok in [preamble[i:i + 8] for i in range(0, len(preamble), 8)]:
                 yield emit({"type": "delta", "text": tok})
                 await asyncio.sleep(0.005)
+            hint = ("（提示：已按您的要求精简为 %d 道菜，保留原方案中您已确认的菜品）" % len(session.current_plan)
+                    if oversized else "（提示：当前方案经校验已全部满足该新约束，无需调整）")
             expl = self._explanation_prompt(
-                session, message + "（提示：当前方案经校验已全部满足该新约束，无需调整）",
+                session, message + hint,
                 balance, {d.recipe_id for d in session.current_plan}, [])
             got_text = False
             try:
@@ -322,10 +348,18 @@ class MealAgent:
             yield self._done(t0, first_ts, store, plan=plan_payload)
             return
 
-        # 4) 选菜池：约束变更/加菜轮用合并查询重检索，否则用并行粗检索
-        query = message if slots.intent not in ("add_constraint", "add_dish") else (
-            (session.history[-2]["content"] if len(session.history) >= 2 else message) + " " + message
-        )
+        # 前导确认句提前到选菜前发射：内容只依赖槽位/约束/替换目标，
+        # 使首个 delta（TTFT 计时点）在意图抽取后即到达；选菜与说明在流中推进
+        preamble = self._preamble(session, slots, replaced=replace_targets)
+        for tok in [preamble[i:i + 8] for i in range(0, len(preamble), 8)]:
+            yield emit({"type": "delta", "text": tok})
+            await asyncio.sleep(0.005)
+
+        # 4) 选菜池检索查询：只取本轮增量（用户消息本身）。
+        #    既有上下文全部经结构化通道生效（ok_ids 约束白名单 / label_filter 餐次 /
+        #    keyword_boost 口味与健康需求），不拼接上轮原文——避免历史措辞
+        #    （如已被推翻的"来点辣的"）与本轮新需求同时进入检索污染召回。
+        query = message
         session.add_history("user", message)
         if slots.intent in ("add_constraint", "replace_dish", "add_dish") and session.current_plan:
             pool = await asyncio.to_thread(
@@ -366,6 +400,10 @@ class MealAgent:
                     reason="补位搭配",
                 ))
                 existing.add(r.id)
+            # 本轮菜数要求少于现有方案 → 按最新需求裁剪（已确认菜品优先保留）
+            if session.dish_count and len(kept_items) > session.dish_count:
+                kept_items.sort(key=lambda d: not d.locked)
+                kept_items = kept_items[: session.dish_count]
             session.current_plan = kept_items
         else:
             session.current_plan = new_items
@@ -375,16 +413,13 @@ class MealAgent:
         plan_payload = self._plan_payload(session, balance)
         yield emit({"type": "plan", **plan_payload})
 
-        # 7) 流式生成说明（先输出前导确认句，选菜完成即刻有产出）
-        preamble = self._preamble(session, slots, replaced=replace_targets)
-        for tok in [preamble[i:i + 8] for i in range(0, len(preamble), 8)]:
-            yield emit({"type": "delta", "text": tok})
-            await asyncio.sleep(0.005)
+        # 7) 流式生成说明（前导句已在选菜前输出；说明仅服务文本流/评测协议，
+        #    UI 已卡片化，限 150 字压尾部延迟）
         expl = self._explanation_prompt(session, message, balance, kept_ids, replace_targets)
         got_text = False
         reply_parts: list[str] = []
         try:
-            async for tok in self.llm.chat_stream(expl):
+            async for tok in self.llm.chat_stream(expl, max_tokens=400):
                 got_text = True
                 reply_parts.append(tok)
                 yield emit({"type": "delta", "text": tok})
@@ -421,7 +456,7 @@ class MealAgent:
             "1. 只能提及方案中列出的菜品，严禁编造菜名或食材",
             "2. 每道菜一句话理由，结合用户健康需求/口味/忌口说明",
             "3. 营养数据必须引用给定数值，不要自己计算",
-            "4. 300字以内，分节可用小标题或 emoji，语气亲切专业，结尾给一句贴心提示",
+            "4. 150字以内，语气亲切专业，结尾给一句贴心提示",
         ]
         if kept_items:
             rules.append("5. 标注「沿用上轮」的菜品是应最小化修改原则保留的，需说明保留原因；未标注的为本轮新选")

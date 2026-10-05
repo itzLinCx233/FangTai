@@ -231,7 +231,12 @@ class DialogSession:
         return "、".join(f"{d.name}[{d.recipe_id}]{('(已确认)' if d.locked else '')}" for d in self.current_plan)
 
     def apply_slots(self, slots: TurnSlots):
-        """增量应用槽位到会话状态（上下文一致性：不遗忘旧约束）。"""
+        """增量应用槽位到会话状态（上下文一致性：不遗忘旧约束）。
+
+        口味冲突以最新对话为准：先前会话追加的同口味忌口被本轮正向口味解除
+        （"别做辣的" → "还是来点辣的"）。过敏/疾病忌口来自档案，不在此解除。
+        同一轮既禁又要的口味（多人口味分歧）保守保留忌口，交由 LLM 选菜权衡。
+        """
         if slots.meal:
             self.meal = slots.meal
         if slots.people:
@@ -243,9 +248,14 @@ class DialogSession:
         if slots.banned_add:
             self.constraints.add_banned([b for b in slots.banned_add if b])
         if slots.taste_add:
+            conflicted = set(slots.banned_add)
             for t in slots.taste_add:
                 canon = TASTE_PREF_MAP.get(t, t)
-                if canon and canon not in (self.constraints.taste_pref or ""):
+                if not canon:
+                    continue
+                if canon not in conflicted:
+                    self.constraints.remove_banned(canon)
+                if canon not in (self.constraints.taste_pref or ""):
                     self.constraints.taste_pref = canon
                     break
 

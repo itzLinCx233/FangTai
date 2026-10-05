@@ -2,19 +2,19 @@
   "summary": {
     "turns_total": 29,
     "first_token_s": {
-      "mean": 1.506,
-      "p95": 2.402,
-      "max": 3.164
+      "mean": 0.542,
+      "p95": 1.018,
+      "max": 1.564
     },
     "first_token_grade": "优秀",
     "turn_e2e_s": {
-      "mean": 3.129,
-      "p95": 4.019,
-      "max": 5.057
+      "mean": 2.772,
+      "p95": 3.279,
+      "max": 4.625
     },
     "turn_e2e_grade": "优秀",
     "multi_avg_s": {
-      "mean": 3.175
+      "mean": 2.786
     },
     "multi_avg_grade": "优秀",
     "allergen_violations": 0,
@@ -27,8 +27,8 @@
       "profile_id": 3,
       "turns": [
         {
-          "first_token_s": 3.164,
-          "total_s": 5.057,
+          "first_token_s": 1.564,
+          "total_s": 4.625,
           "plan": {
             "type": "plan",
             "meal": "晚餐",
@@ -86,7 +86,7 @@
             },
             "constraints_applied": "过敏：花生；忌口：高血压、高血糖；健康需求：降血压、控糖、护心"
           },
-          "reply_len": 311,
+          "reply_len": 170,
           "turn": 1,
           "profile_id": 3,
           "message": "今晚吃啥比较好？",
@@ -98,15 +98,15 @@
           }
         }
       ],
-      "case_avg_s": 5.057
+      "case_avg_s": 4.625
     },
     {
       "case_id": 2,
       "profile_id": 2,
       "turns": [
         {
-          "first_token_s": 1.123,
-          "total_s": 2.519,
+          "first_token_s": 0.0,
+          "total_s": 2.028,
           "plan": {
             "type": "plan",
             "meal": "早餐",
@@ -116,7 +116,7 @@
                 "id": 789,
                 "name": "虾仁豆腐蒸水蛋",
                 "role": "荤菜",
-                "reason": "虾仁豆腐蒸蛋补钙铁",
+                "reason": "虾仁豆腐蒸蛋补钙铁易消化",
                 "kept": false,
                 "ingredients": [
                   "内脂豆腐",
@@ -133,7 +133,7 @@
                 "id": 576,
                 "name": "山药黑芝麻糊",
                 "role": "素菜",
-                "reason": "山药芝麻糊补钙补血",
+                "reason": "山药芝麻糊补钙铁酸甜养胃",
                 "kept": false,
                 "ingredients": [
                   "山药",
@@ -163,7 +163,7 @@
             },
             "constraints_applied": "忌口：孕妇；健康需求：补钙、补铁、均衡营养"
           },
-          "reply_len": 288,
+          "reply_len": 148,
           "turn": 1,
           "profile_id": 2,
           "message": "帮我想个简单点的早餐。",
@@ -175,15 +175,15 @@
           }
         }
       ],
-      "case_avg_s": 2.519
+      "case_avg_s": 2.028
     },
     {
       "case_id": 3,
       "profile_id": 17,
       "turns": [
         {
-          "first_token_s": 1.923,
-          "total_s": 3.381,
+          "first_token_s": 0.849,
+          "total_s": 3.232,
           "plan": {
             "type": "plan",
             "meal": "午餐",
@@ -207,41 +207,42 @@
                 ]
               },
               {
-                "id": 1882,
-                "name": "清香肉沫蒸冬瓜",
-                "role": "素菜",
-                "reason": "冬瓜蒸肉末，清淡利水",
+                "id": 1940,
+                "name": "清蒸鸡",
+                "role": "荤菜",
+                "reason": "清蒸低脂，无海鲜宜控糖",
                 "kept": false,
                 "ingredients": [
-                  "冬瓜片",
-                  "肉末",
-                  "蒜末",
-                  "姜末",
-                  "葱花",
-                  "盐",
-                  "生抽"
+                  "鸡肉",
+                  "水发木耳",
+                  "西兰花",
+                  "玉兰片",
+                  "姜片",
+                  "香菜",
+                  "料酒",
+                  "盐"
                 ]
               }
             ],
             "nutrition_per_person": {
               "intake": {
-                "kcal": 213,
-                "protein_g": 7.8,
-                "fat_g": 11.6,
-                "carbs_g": 20.4
+                "kcal": 798,
+                "protein_g": 73.1,
+                "fat_g": 42.9,
+                "carbs_g": 31.0
               },
               "target_kcal": 720,
               "deviation_pct": {
-                "kcal": -70.4,
-                "protein": -72.2,
-                "fat": -51.7,
-                "carbs": -79.6
+                "kcal": 10.9,
+                "protein": 161.2,
+                "fat": 78.9,
+                "carbs": -69.0
               },
-              "purine_level": "低嘌呤"
+              "purine_level": "高嘌呤"
             },
             "constraints_applied": "过敏：海鲜；忌口：高尿酸、高血糖；口味偏好：清爽；健康需求：控糖、降尿酸、护肾"
           },
-          "reply_len": 259,
+          "reply_len": 143,
           "turn": 1,
           "profile_id": 17,
           "message": "中午想吃点清爽的，有没有那种适合夏天的搭配？",
@@ -253,15 +254,15 @@
           }
         }
       ],
-      "case_avg_s": 3.381
+      "case_avg_s": 3.232
     },
     {
       "case_id": 4,
       "profile_id": 16,
       "turns": [
         {
-          "first_token_s": 1.706,
-          "total_s": 3.133,
+          "first_token_s": 0.927,
+          "total_s": 3.006,
           "plan": {
             "type": "plan",
             "meal": "晚餐",
@@ -271,7 +272,7 @@
                 "id": 1827,
                 "name": "黄芪淮山猪骨汤",
                 "role": "汤",
-                "reason": "催乳补气血清淡",
+                "reason": "催乳补气血，清淡开胃",
                 "kept": false,
                 "ingredients": [
                   "筒骨",
@@ -285,42 +286,42 @@
                 ]
               },
               {
-                "id": 1144,
-                "name": "老陈皮百合山药炖银耳",
-                "role": "素菜",
-                "reason": "安神养胃助眠",
+                "id": 937,
+                "name": "苹果八宝饭",
+                "role": "菜",
+                "reason": "",
                 "kept": false,
                 "ingredients": [
-                  "鲜百合",
-                  "鲜山药",
-                  "干银耳",
-                  "老陈皮",
-                  "红枣5粒",
+                  "苹果",
+                  "糯米",
+                  "清水",
+                  "桂圆肉",
+                  "红豆沙",
                   "枸杞",
-                  "沸水",
-                  "冰糖"
+                  "蜜枣",
+                  "蔓越莓干"
                 ]
               }
             ],
             "nutrition_per_person": {
               "intake": {
-                "kcal": 976,
-                "protein_g": 23.9,
-                "fat_g": 22.7,
-                "carbs_g": 170.0
+                "kcal": 605,
+                "protein_g": 11.5,
+                "fat_g": 19.1,
+                "carbs_g": 97.8
               },
               "target_kcal": 720,
               "deviation_pct": {
-                "kcal": 35.5,
-                "protein": -14.8,
-                "fat": -5.4,
-                "carbs": 70.0
+                "kcal": -16.0,
+                "protein": -58.9,
+                "fat": -20.2,
+                "carbs": -2.2
               },
               "purine_level": "低嘌呤"
             },
             "constraints_applied": "忌口：哺乳期；健康需求：催乳、补气血、安神"
           },
-          "reply_len": 240,
+          "reply_len": 147,
           "turn": 1,
           "profile_id": 16,
           "message": "晚上两个人吃，最近胃口不太好",
@@ -332,15 +333,15 @@
           }
         }
       ],
-      "case_avg_s": 3.133
+      "case_avg_s": 3.006
     },
     {
       "case_id": 5,
       "profile_id": 1,
       "turns": [
         {
-          "first_token_s": 1.043,
-          "total_s": 2.79,
+          "first_token_s": 0.0,
+          "total_s": 2.293,
           "plan": {
             "type": "plan",
             "meal": "午餐",
@@ -350,7 +351,7 @@
                 "id": 1697,
                 "name": "香菇豆腐蒸鸡片",
                 "role": "荤菜",
-                "reason": "鸡胸豆腐高蛋白增肌",
+                "reason": "高蛋白低脂，适合增肌",
                 "kept": false,
                 "ingredients": [
                   "鸡胸肉",
@@ -367,7 +368,7 @@
                 "id": 1008,
                 "name": "过桥豆腐",
                 "role": "豆制品",
-                "reason": "豆腐蛋汤清淡补蛋白",
+                "reason": "豆腐蛋汤，清淡补蛋白",
                 "kept": false,
                 "ingredients": [
                   "鸡蛋",
@@ -399,7 +400,7 @@
             },
             "constraints_applied": "过敏：海鲜；健康需求：增肌、补充蛋白质"
           },
-          "reply_len": 301,
+          "reply_len": 154,
           "turn": 1,
           "profile_id": 1,
           "message": "帮我想个带去公司的午饭吧",
@@ -411,15 +412,15 @@
           }
         }
       ],
-      "case_avg_s": 2.79
+      "case_avg_s": 2.293
     },
     {
       "case_id": 6,
       "profile_id": 6,
       "turns": [
         {
-          "first_token_s": 1.686,
-          "total_s": 3.012,
+          "first_token_s": 0.846,
+          "total_s": 3.154,
           "plan": {
             "type": "plan",
             "meal": "晚餐",
@@ -429,7 +430,7 @@
                 "id": 906,
                 "name": "榨菜肉丝汤",
                 "role": "汤",
-                "reason": "清淡补铁，半小时可做",
+                "reason": "清淡补铁，快速易做",
                 "kept": false,
                 "ingredients": [
                   "猪里脊肉",
@@ -446,7 +447,7 @@
                 "id": 1163,
                 "name": "香烤豆腐",
                 "role": "豆制品",
-                "reason": "补钙催乳，烤制省时",
+                "reason": "补钙催乳，清淡少油",
                 "kept": false,
                 "ingredients": [
                   "手工嫩豆腐",
@@ -478,7 +479,7 @@
             },
             "constraints_applied": "过敏：海鲜、鸡蛋；忌口：哺乳期；健康需求：催乳、补钙、补铁"
           },
-          "reply_len": 261,
+          "reply_len": 194,
           "turn": 1,
           "profile_id": 6,
           "message": "我今天下班会比较晚，想做个半小时内能搞定的晚饭。",
@@ -490,15 +491,15 @@
           }
         }
       ],
-      "case_avg_s": 3.012
+      "case_avg_s": 3.154
     },
     {
       "case_id": 7,
       "profile_id": 24,
       "turns": [
         {
-          "first_token_s": 1.683,
-          "total_s": 3.313,
+          "first_token_s": 0.736,
+          "total_s": 2.736,
           "plan": {
             "type": "plan",
             "meal": null,
@@ -508,7 +509,7 @@
                 "id": 1151,
                 "name": "法式番茄浓汤",
                 "role": "汤",
-                "reason": "番茄土豆清淡降压",
+                "reason": "番茄土豆浓汤，清淡降压",
                 "kept": false,
                 "ingredients": [
                   "橄榄油",
@@ -524,7 +525,7 @@
                 "id": 1458,
                 "name": "青椒番茄土豆片",
                 "role": "素菜",
-                "reason": "番茄土豆控糖低脂",
+                "reason": "番茄土豆片，控糖饱腹",
                 "kept": false,
                 "ingredients": [
                   "食用油",
@@ -554,7 +555,7 @@
             },
             "constraints_applied": "忌口：高血压、高血糖；健康需求：降压、控糖、调节血脂"
           },
-          "reply_len": 322,
+          "reply_len": 167,
           "turn": 1,
           "profile_id": 24,
           "message": "家里现在就剩番茄、鸡蛋和土豆了，这顿饭还能怎么弄？要能当正餐",
@@ -566,15 +567,15 @@
           }
         }
       ],
-      "case_avg_s": 3.313
+      "case_avg_s": 2.736
     },
     {
       "case_id": 8,
       "profile_id": 30,
       "turns": [
         {
-          "first_token_s": 1.502,
-          "total_s": 2.88,
+          "first_token_s": 0.586,
+          "total_s": 2.597,
           "plan": {
             "type": "plan",
             "meal": "晚餐",
@@ -584,7 +585,7 @@
                 "id": 657,
                 "name": "南京鸭血粉丝",
                 "role": "荤菜",
-                "reason": "面食满足需求，鸭血补铁",
+                "reason": "鸭血粉丝补铁，微辣合口味",
                 "kept": false,
                 "ingredients": [
                   "鸭血",
@@ -633,7 +634,7 @@
             },
             "constraints_applied": "过敏：蟹；忌口：孕妇；健康需求：补铁、补钙、控制血糖"
           },
-          "reply_len": 285,
+          "reply_len": 164,
           "turn": 1,
           "profile_id": 30,
           "message": "我今晚有点想吃面，再帮我配个别太抢味的小菜。",
@@ -645,42 +646,25 @@
           }
         }
       ],
-      "case_avg_s": 2.88
+      "case_avg_s": 2.597
     },
     {
       "case_id": 9,
       "profile_id": 37,
       "turns": [
         {
-          "first_token_s": 1.909,
-          "total_s": 3.735,
+          "first_token_s": 1.015,
+          "total_s": 2.929,
           "plan": {
             "type": "plan",
             "meal": null,
             "people": 2,
             "dishes": [
               {
-                "id": 1631,
-                "name": "清蒸鳜鱼",
-                "role": "荤菜",
-                "reason": "清蒸鳜鱼补锌优质蛋白",
-                "kept": false,
-                "ingredients": [
-                  "鳜鱼",
-                  "生姜",
-                  "京葱",
-                  "红椒",
-                  "食盐",
-                  "白醋",
-                  "食用油",
-                  "蒸鱼豉油"
-                ]
-              },
-              {
                 "id": 1403,
                 "name": "日式味增汤",
                 "role": "汤",
-                "reason": "味增汤含虾豆腐补锌",
+                "reason": "味增汤清淡补锌",
                 "kept": false,
                 "ingredients": [
                   "木鱼花",
@@ -692,27 +676,43 @@
                   "味增",
                   "葱花"
                 ]
+              },
+              {
+                "id": 11,
+                "name": "清蒸海蛎子",
+                "role": "荤菜",
+                "reason": "牡蛎高锌助备孕",
+                "kept": false,
+                "ingredients": [
+                  "新鲜牡蛎",
+                  "葱",
+                  "香菜",
+                  "蒜",
+                  "蚝油",
+                  "醋",
+                  "蒸鱼豉油"
+                ]
               }
             ],
             "nutrition_per_person": {
               "intake": {
-                "kcal": 541,
-                "protein_g": 78.0,
-                "fat_g": 20.8,
-                "carbs_g": 10.4
+                "kcal": 324,
+                "protein_g": 38.9,
+                "fat_g": 9.4,
+                "carbs_g": 20.8
               },
               "target_kcal": 880,
               "deviation_pct": {
-                "kcal": -38.6,
-                "protein": 129.3,
-                "fat": -25.8,
-                "carbs": -91.7
+                "kcal": -63.2,
+                "protein": 14.5,
+                "fat": -66.5,
+                "carbs": -83.4
               },
               "purine_level": "高嘌呤"
             },
             "constraints_applied": "过敏：鸡蛋；忌口：备孕；健康需求：提高精子质量、补充锌、减脂"
           },
-          "reply_len": 337,
+          "reply_len": 172,
           "turn": 1,
           "profile_id": 37,
           "message": "周末想在家吃得有点仪式感，但我又不想做太复杂。",
@@ -724,15 +724,15 @@
           }
         }
       ],
-      "case_avg_s": 3.735
+      "case_avg_s": 2.929
     },
     {
       "case_id": 10,
       "profile_id": 19,
       "turns": [
         {
-          "first_token_s": 1.047,
-          "total_s": 2.766,
+          "first_token_s": 0.0,
+          "total_s": 1.622,
           "plan": {
             "type": "plan",
             "meal": "晚餐",
@@ -758,7 +758,7 @@
                 "id": 1940,
                 "name": "清蒸鸡",
                 "role": "荤菜",
-                "reason": "低脂高蛋白，清淡护心",
+                "reason": "低脂高蛋白，护心减脂",
                 "kept": false,
                 "ingredients": [
                   "鸡肉",
@@ -790,7 +790,7 @@
             },
             "constraints_applied": "过敏：花生；忌口：高血压；健康需求：降压、护心、减脂"
           },
-          "reply_len": 282,
+          "reply_len": 177,
           "turn": 1,
           "profile_id": 19,
           "message": "晚上有点饿，想吃个热乎点的夜宵",
@@ -802,15 +802,15 @@
           }
         }
       ],
-      "case_avg_s": 2.766
+      "case_avg_s": 1.622
     },
     {
       "case_id": 11,
       "profile_id": 8,
       "turns": [
         {
-          "first_token_s": 2.232,
-          "total_s": 3.809,
+          "first_token_s": 0.95,
+          "total_s": 2.9,
           "plan": {
             "type": "plan",
             "meal": "晚餐",
@@ -837,7 +837,7 @@
                 "id": 1249,
                 "name": "蒜苔炒肉丝",
                 "role": "素菜",
-                "reason": "瘦肉补铁，微辣合酸辣口",
+                "reason": "瘦肉补铁，酸辣开胃下饭",
                 "kept": false,
                 "ingredients": [
                   "猪瘦肉",
@@ -886,7 +886,7 @@
             },
             "constraints_applied": "过敏：芒果；忌口：孕妇；健康需求：补叶酸、补铁、防便秘"
           },
-          "reply_len": 301,
+          "reply_len": 152,
           "turn": 1,
           "profile_id": 8,
           "message": "想做顿一家四口吃的晚饭",
@@ -898,15 +898,15 @@
           }
         }
       ],
-      "case_avg_s": 3.809
+      "case_avg_s": 2.9
     },
     {
       "case_id": 12,
       "profile_id": 22,
       "turns": [
         {
-          "first_token_s": 1.235,
-          "total_s": 2.984,
+          "first_token_s": 0.0,
+          "total_s": 2.533,
           "plan": {
             "type": "plan",
             "meal": null,
@@ -933,7 +933,7 @@
                 "id": 722,
                 "name": "鲜虾蒸豆腐",
                 "role": "豆制品",
-                "reason": "虾仁豆腐低卡",
+                "reason": "虾仁豆腐补钙",
                 "kept": false,
                 "ingredients": [
                   "豆腐",
@@ -964,27 +964,27 @@
                 ]
               },
               {
-                "id": 1808,
-                "name": "蒸秋季时蔬",
-                "role": "素菜",
-                "reason": "蒸时蔬营养均衡",
+                "id": 329,
+                "name": "虾皮香菇蒸冬瓜",
+                "role": "荤菜",
+                "reason": "冬瓜香菇低卡",
                 "kept": false,
                 "ingredients": [
-                  "土豆",
+                  "水发虾皮",
                   "香菇",
-                  "胡萝卜",
-                  "花菜",
-                  "南瓜",
-                  "豆腐",
-                  "紫菜",
-                  "酱油"
+                  "冬瓜",
+                  "姜末",
+                  "蒜末",
+                  "葱花",
+                  "盐",
+                  "鸡粉"
                 ]
               },
               {
                 "id": 585,
                 "name": "冬瓜虾皮汤",
                 "role": "汤",
-                "reason": "冬瓜虾皮低脂汤",
+                "reason": "冬瓜虾皮汤清淡",
                 "kept": false,
                 "ingredients": [
                   "食用油",
@@ -998,23 +998,23 @@
             ],
             "nutrition_per_person": {
               "intake": {
-                "kcal": 1482,
+                "kcal": 1494,
                 "protein_g": 107.4,
-                "fat_g": 88.4,
-                "carbs_g": 68.3
+                "fat_g": 95.0,
+                "carbs_g": 56.5
               },
               "target_kcal": 720,
               "deviation_pct": {
-                "kcal": 105.8,
-                "protein": 283.4,
-                "fat": 268.2,
-                "carbs": -31.7
+                "kcal": 107.5,
+                "protein": 283.5,
+                "fat": 295.8,
+                "carbs": -43.5
               },
               "purine_level": "高嘌呤"
             },
             "constraints_applied": "过敏：芒果；健康需求：减脂、排毒"
           },
-          "reply_len": 364,
+          "reply_len": 169,
           "turn": 1,
           "profile_id": 22,
           "message": "想做个四菜一汤，营养均衡一点的",
@@ -1026,15 +1026,15 @@
           }
         }
       ],
-      "case_avg_s": 2.984
+      "case_avg_s": 2.533
     },
     {
       "case_id": 13,
       "profile_id": 5,
       "turns": [
         {
-          "first_token_s": 1.062,
-          "total_s": 2.623,
+          "first_token_s": 0.0,
+          "total_s": 2.182,
           "plan": {
             "type": "plan",
             "meal": null,
@@ -1093,7 +1093,7 @@
             },
             "constraints_applied": "忌口：高尿酸、高血压；健康需求：降尿酸、降压、护肾"
           },
-          "reply_len": 255,
+          "reply_len": 160,
           "turn": 1,
           "profile_id": 5,
           "message": "今天状态不太好，想吃点暖胃的。",
@@ -1105,15 +1105,15 @@
           }
         }
       ],
-      "case_avg_s": 2.623
+      "case_avg_s": 2.182
     },
     {
       "case_id": 14,
       "profile_id": 13,
       "turns": [
         {
-          "first_token_s": 2.426,
-          "total_s": 4.019,
+          "first_token_s": 1.055,
+          "total_s": 3.516,
           "plan": {
             "type": "plan",
             "meal": null,
@@ -1123,7 +1123,7 @@
                 "id": 502,
                 "name": "山药莲子排骨汤",
                 "role": "汤",
-                "reason": "清淡降压补肾助眠",
+                "reason": "清淡降压，山药补肾助眠",
                 "kept": false,
                 "ingredients": [
                   "排骨",
@@ -1140,7 +1140,7 @@
                 "id": 1324,
                 "name": "百合虾仁",
                 "role": "荤菜",
-                "reason": "低脂高蛋白护心助眠",
+                "reason": "低脂高蛋白，百合助眠",
                 "kept": false,
                 "ingredients": [
                   "虾仁",
@@ -1157,7 +1157,7 @@
                 "id": 1781,
                 "name": "素炒芹菜",
                 "role": "素菜",
-                "reason": "降压通便清淡不辣",
+                "reason": "清淡降压，芹菜高纤维",
                 "kept": false,
                 "ingredients": [
                   "食用油",
@@ -1174,7 +1174,7 @@
                 "id": 539,
                 "name": "蒸冬瓜肉卷",
                 "role": "素菜",
-                "reason": "软嫩易嚼低脂清淡",
+                "reason": "冬瓜清淡，软嫩适合老人",
                 "kept": false,
                 "ingredients": [
                   "冬瓜",
@@ -1206,7 +1206,7 @@
             },
             "constraints_applied": "忌口：高血压；本轮忌口：辣；健康需求：降压、补肾、改善睡眠"
           },
-          "reply_len": 329,
+          "reply_len": 175,
           "turn": 1,
           "profile_id": 13,
           "message": "想做个四菜一汤，营养均衡一点的，小孩不吃辣，老人牙口不好",
@@ -1218,15 +1218,15 @@
           }
         }
       ],
-      "case_avg_s": 4.019
+      "case_avg_s": 3.516
     },
     {
       "case_id": 15,
       "profile_id": 26,
       "turns": [
         {
-          "first_token_s": 0.787,
-          "total_s": 2.396,
+          "first_token_s": 0.0,
+          "total_s": 2.262,
           "plan": {
             "type": "plan",
             "meal": "晚餐",
@@ -1283,7 +1283,7 @@
             },
             "constraints_applied": "过敏：鸡蛋；忌口：哺乳期；健康需求：催乳、补钙、恢复体型"
           },
-          "reply_len": 285,
+          "reply_len": 162,
           "turn": 1,
           "profile_id": 26,
           "message": "帮我想顿晚饭。",
@@ -1295,28 +1295,13 @@
           }
         },
         {
-          "first_token_s": 0.644,
-          "total_s": 2.212,
+          "first_token_s": 0.681,
+          "total_s": 2.948,
           "plan": {
             "type": "plan",
             "meal": "晚餐",
             "people": 2,
             "dishes": [
-              {
-                "id": 585,
-                "name": "冬瓜虾皮汤",
-                "role": "汤",
-                "reason": "催乳补钙清淡",
-                "kept": true,
-                "ingredients": [
-                  "食用油",
-                  "虾皮",
-                  "冬瓜",
-                  "盐",
-                  "水",
-                  "葱花"
-                ]
-              },
               {
                 "id": 722,
                 "name": "鲜虾蒸豆腐",
@@ -1333,47 +1318,79 @@
                   "食用油",
                   "醋"
                 ]
+              },
+              {
+                "id": 1440,
+                "name": "鲈鱼蒸豆腐",
+                "role": "荤菜",
+                "reason": "鲈鱼豆腐补钙催乳清淡",
+                "kept": false,
+                "ingredients": [
+                  "鲈鱼",
+                  "嫩豆腐",
+                  "葱姜",
+                  "盐",
+                  "生抽",
+                  "糖"
+                ]
+              },
+              {
+                "id": 1677,
+                "name": "豆腐蒸黄鱼",
+                "role": "荤菜",
+                "reason": "补位搭配",
+                "kept": false,
+                "ingredients": [
+                  "黄鱼",
+                  "豆腐",
+                  "青红椒丝",
+                  "姜丝",
+                  "葱花",
+                  "盐",
+                  "鸡粉",
+                  "蒸鱼豉油"
+                ]
               }
             ],
             "nutrition_per_person": {
               "intake": {
-                "kcal": 296,
-                "protein_g": 20.8,
-                "fat_g": 20.1,
-                "carbs_g": 7.9
+                "kcal": 443,
+                "protein_g": 48.6,
+                "fat_g": 22.8,
+                "carbs_g": 9.9
               },
               "target_kcal": 880,
               "deviation_pct": {
-                "kcal": -66.3,
-                "protein": -38.8,
-                "fat": -28.1,
-                "carbs": -93.7
+                "kcal": -49.7,
+                "protein": 42.8,
+                "fat": -18.6,
+                "carbs": -92.0
               },
-              "purine_level": "中嘌呤"
+              "purine_level": "高嘌呤"
             },
             "constraints_applied": "过敏：鸡蛋；忌口：哺乳期；本轮忌口：辣；口味偏好：清淡；健康需求：催乳、补钙、恢复体型"
           },
-          "reply_len": 285,
+          "reply_len": 200,
           "turn": 2,
           "profile_id": 26,
           "message": "别做辣的，口味清淡一点。",
           "validation": {
             "violations": [],
             "hallucinated": [],
-            "dish_count": 2,
+            "dish_count": 3,
             "ok": true
           }
         }
       ],
-      "case_avg_s": 2.304
+      "case_avg_s": 2.605
     },
     {
       "case_id": 16,
       "profile_id": 10,
       "turns": [
         {
-          "first_token_s": 0.982,
-          "total_s": 2.408,
+          "first_token_s": 0.0,
+          "total_s": 2.033,
           "plan": {
             "type": "plan",
             "meal": "午餐",
@@ -1383,7 +1400,7 @@
                 "id": 1403,
                 "name": "日式味增汤",
                 "role": "汤",
-                "reason": "清淡味增汤，低糖低脂",
+                "reason": "味增汤低脂控糖",
                 "kept": false,
                 "ingredients": [
                   "木鱼花",
@@ -1400,7 +1417,7 @@
                 "id": 1815,
                 "name": "西兰花炒虾仁",
                 "role": "荤菜",
-                "reason": "虾仁西兰花，控糖减脂",
+                "reason": "虾仁西兰花低脂高蛋白",
                 "kept": false,
                 "ingredients": [
                   "虾仁",
@@ -1431,7 +1448,7 @@
             },
             "constraints_applied": "忌口：高血糖；健康需求：控糖、减脂、调理内分泌"
           },
-          "reply_len": 320,
+          "reply_len": 176,
           "turn": 1,
           "profile_id": 10,
           "message": "中午这顿饭你帮我安排一下。",
@@ -1443,8 +1460,8 @@
           }
         },
         {
-          "first_token_s": 1.534,
-          "total_s": 2.92,
+          "first_token_s": 0.743,
+          "total_s": 3.229,
           "plan": {
             "type": "plan",
             "meal": "午餐",
@@ -1454,7 +1471,7 @@
                 "id": 1815,
                 "name": "西兰花炒虾仁",
                 "role": "荤菜",
-                "reason": "西兰花炒虾仁，低脂高蛋白",
+                "reason": "虾仁西兰花低脂高蛋白",
                 "kept": false,
                 "ingredients": [
                   "虾仁",
@@ -1467,39 +1484,42 @@
                 ]
               },
               {
-                "id": 500,
-                "name": "蒜香豆豉蒸秋葵",
-                "role": "素菜",
-                "reason": "蒜香豆豉蒸秋葵，清淡控糖",
+                "id": 1330,
+                "name": "虾仁豆腐蒸水蛋",
+                "role": "荤菜",
+                "reason": "虾仁豆腐蒸水蛋清淡控糖",
                 "kept": false,
                 "ingredients": [
-                  "秋葵",
-                  "豆豉",
-                  "蒜泥",
-                  "蒸鱼豉油",
-                  "橄榄油"
+                  "鲜虾仁",
+                  "淀粉",
+                  "鸡蛋",
+                  "盐",
+                  "温水",
+                  "内酯豆腐",
+                  "水",
+                  "蒸鱼豉油"
                 ]
               }
             ],
             "nutrition_per_person": {
               "intake": {
-                "kcal": 224,
-                "protein_g": 14.4,
-                "fat_g": 12.4,
-                "carbs_g": 17.1
+                "kcal": 331,
+                "protein_g": 25.9,
+                "fat_g": 17.5,
+                "carbs_g": 18.1
               },
               "target_kcal": 880,
               "deviation_pct": {
-                "kcal": -74.5,
-                "protein": -57.6,
-                "fat": -55.9,
-                "carbs": -86.3
+                "kcal": -62.4,
+                "protein": -23.7,
+                "fat": -37.6,
+                "carbs": -85.5
               },
               "purine_level": "中嘌呤"
             },
             "constraints_applied": "忌口：高血糖；健康需求：控糖、减脂、调理内分泌"
           },
-          "reply_len": 290,
+          "reply_len": 170,
           "turn": 2,
           "profile_id": 10,
           "message": "两个人吃，最近在减脂。",
@@ -1511,15 +1531,15 @@
           }
         }
       ],
-      "case_avg_s": 2.664
+      "case_avg_s": 2.631
     },
     {
       "case_id": 17,
       "profile_id": 28,
       "turns": [
         {
-          "first_token_s": 0.986,
-          "total_s": 2.509,
+          "first_token_s": 0.0,
+          "total_s": 2.69,
           "plan": {
             "type": "plan",
             "meal": "早餐",
@@ -1569,7 +1589,7 @@
             },
             "constraints_applied": "过敏：坚果；忌口：备孕；健康需求：补气血、暖宫、调节激素"
           },
-          "reply_len": 243,
+          "reply_len": 172,
           "turn": 1,
           "profile_id": 28,
           "message": "给我推荐个早餐吧。",
@@ -1581,8 +1601,8 @@
           }
         },
         {
-          "first_token_s": 1.589,
-          "total_s": 3.097,
+          "first_token_s": 0.675,
+          "total_s": 3.14,
           "plan": {
             "type": "plan",
             "meal": "早餐",
@@ -1605,7 +1625,7 @@
                 "id": 17,
                 "name": "红豆薏米粥",
                 "role": "汤",
-                "reason": "补血暖宫，少糖快煮",
+                "reason": "补血暖宫，快捷不甜",
                 "kept": false,
                 "ingredients": [
                   "红豆",
@@ -1633,7 +1653,7 @@
             },
             "constraints_applied": "过敏：坚果；忌口：备孕；本轮忌口：甜；健康需求：补气血、暖宫、调节激素"
           },
-          "reply_len": 315,
+          "reply_len": 212,
           "turn": 2,
           "profile_id": 28,
           "message": "别太甜，最好十分钟左右就能弄好。",
@@ -1645,15 +1665,15 @@
           }
         }
       ],
-      "case_avg_s": 2.803
+      "case_avg_s": 2.915
     },
     {
       "case_id": 18,
       "profile_id": 18,
       "turns": [
         {
-          "first_token_s": 0.873,
-          "total_s": 2.604,
+          "first_token_s": 0.0,
+          "total_s": 2.538,
           "plan": {
             "type": "plan",
             "meal": null,
@@ -1680,7 +1700,7 @@
                 "id": 1677,
                 "name": "豆腐蒸黄鱼",
                 "role": "荤菜",
-                "reason": "补叶酸低脂清淡",
+                "reason": "高蛋白低脂补叶酸",
                 "kept": false,
                 "ingredients": [
                   "黄鱼",
@@ -1712,7 +1732,7 @@
             },
             "constraints_applied": "过敏：牛奶；忌口：备孕；健康需求：补叶酸、养子宫、调理气血"
           },
-          "reply_len": 285,
+          "reply_len": 178,
           "turn": 1,
           "profile_id": 18,
           "message": "周末想请几个人来家里吃饭，你帮我设计一桌菜。",
@@ -1724,8 +1744,8 @@
           }
         },
         {
-          "first_token_s": 2.099,
-          "total_s": 4.112,
+          "first_token_s": 0.758,
+          "total_s": 3.279,
           "plan": {
             "type": "plan",
             "meal": null,
@@ -1784,7 +1804,7 @@
                 "id": 637,
                 "name": "素卤",
                 "role": "素菜",
-                "reason": "酸香开胃含叶酸",
+                "reason": "酸辣开胃含豆制品",
                 "kept": false,
                 "ingredients": [
                   "食用油",
@@ -1832,7 +1852,7 @@
             },
             "constraints_applied": "过敏：牛奶；忌口：备孕；健康需求：补叶酸、养子宫、调理气血"
           },
-          "reply_len": 343,
+          "reply_len": 216,
           "turn": 2,
           "profile_id": 18,
           "message": "大概六个人，稍微正式点，但别整得太难做。",
@@ -1844,15 +1864,15 @@
           }
         }
       ],
-      "case_avg_s": 3.358
+      "case_avg_s": 2.909
     },
     {
       "case_id": 19,
       "profile_id": 4,
       "turns": [
         {
-          "first_token_s": 1.097,
-          "total_s": 2.885,
+          "first_token_s": 0.0,
+          "total_s": 2.175,
           "plan": {
             "type": "plan",
             "meal": "晚餐",
@@ -1879,7 +1899,7 @@
                 "id": 1808,
                 "name": "蒸秋季时蔬",
                 "role": "素菜",
-                "reason": "清淡蒸时蔬助消化",
+                "reason": "清淡均衡助消化",
                 "kept": false,
                 "ingredients": [
                   "土豆",
@@ -1911,7 +1931,7 @@
             },
             "constraints_applied": "过敏：牛奶；忌口：备孕；健康需求：补气血、调理月经、养脾胃"
           },
-          "reply_len": 335,
+          "reply_len": 185,
           "turn": 1,
           "profile_id": 4,
           "message": "帮我安排一顿晚饭。",
@@ -1923,8 +1943,8 @@
           }
         },
         {
-          "first_token_s": 1.969,
-          "total_s": 3.901,
+          "first_token_s": 0.736,
+          "total_s": 2.8,
           "plan": {
             "type": "plan",
             "meal": "晚餐",
@@ -1979,7 +1999,7 @@
             },
             "constraints_applied": "过敏：牛奶；忌口：备孕；健康需求：补气血、调理月经、养脾胃"
           },
-          "reply_len": 306,
+          "reply_len": 142,
           "turn": 2,
           "profile_id": 4,
           "message": "最近没什么精神，有没有补气血的",
@@ -1991,8 +2011,8 @@
           }
         },
         {
-          "first_token_s": 0.57,
-          "total_s": 2.105,
+          "first_token_s": 0.601,
+          "total_s": 1.911,
           "plan": {
             "type": "plan",
             "meal": "晚餐",
@@ -2047,7 +2067,7 @@
             },
             "constraints_applied": "过敏：牛奶；忌口：备孕；健康需求：补气血、调理月经、养脾胃"
           },
-          "reply_len": 304,
+          "reply_len": 185,
           "turn": 3,
           "profile_id": 4,
           "message": "家常一点。",
@@ -2059,15 +2079,15 @@
           }
         }
       ],
-      "case_avg_s": 2.964
+      "case_avg_s": 2.295
     },
     {
       "case_id": 20,
       "profile_id": 50,
       "turns": [
         {
-          "first_token_s": 2.402,
-          "total_s": 3.872,
+          "first_token_s": 0.513,
+          "total_s": 2.773,
           "plan": {
             "type": "plan",
             "meal": "晚餐",
@@ -2077,7 +2097,7 @@
                 "id": 1728,
                 "name": "豆豉鳕鱼",
                 "role": "荤菜",
-                "reason": "鳕鱼补蛋白，豆豉微辣合口味",
+                "reason": "鳕鱼补蛋白，微辣合口味",
                 "kept": false,
                 "ingredients": [
                   "鳕鱼",
@@ -2091,7 +2111,7 @@
                 "id": 1694,
                 "name": "海带竹荪汤",
                 "role": "汤",
-                "reason": "海带竹荪汤清淡补碘",
+                "reason": "海带竹荪汤清淡暖身",
                 "kept": false,
                 "ingredients": [
                   "干竹荪",
@@ -2123,7 +2143,7 @@
             },
             "constraints_applied": "过敏：鸡蛋；忌口：备孕；健康需求：补叶酸、暖宫、调理月经"
           },
-          "reply_len": 250,
+          "reply_len": 182,
           "turn": 1,
           "profile_id": 50,
           "message": "给我想一顿两个人的晚饭。",
@@ -2135,8 +2155,8 @@
           }
         },
         {
-          "first_token_s": 0.92,
-          "total_s": 2.531,
+          "first_token_s": 0.714,
+          "total_s": 3.221,
           "plan": {
             "type": "plan",
             "meal": "晚餐",
@@ -2146,7 +2166,7 @@
                 "id": 1728,
                 "name": "豆豉鳕鱼",
                 "role": "荤菜",
-                "reason": "鳕鱼补蛋白，豆豉微辣合口味",
+                "reason": "鳕鱼补蛋白，微辣合口味",
                 "kept": true,
                 "ingredients": [
                   "鳕鱼",
@@ -2157,79 +2177,94 @@
                 ]
               },
               {
-                "id": 1694,
-                "name": "海带竹荪汤",
-                "role": "汤",
-                "reason": "海带竹荪汤清淡补碘",
-                "kept": true,
+                "id": 622,
+                "name": "蛤蜊蘑菇鸡",
+                "role": "荤菜",
+                "reason": "辣味鸡肉蛤蜊，补铁暖宫",
+                "kept": false,
                 "ingredients": [
-                  "干竹荪",
-                  "海带",
-                  "土豆",
                   "食用油",
-                  "姜片",
+                  "蒜粒",
+                  "姜粒",
+                  "洋葱",
+                  "鸡肉",
+                  "生抽",
+                  "老抽",
+                  "蚝油"
+                ]
+              },
+              {
+                "id": 574,
+                "name": "姜母茶",
+                "role": "素菜",
+                "reason": "补位搭配",
+                "kept": false,
+                "ingredients": [
+                  "老姜",
+                  "去核红枣",
+                  "枸杞",
                   "水",
-                  "盐",
-                  "葱花"
+                  "红糖"
                 ]
               }
             ],
             "nutrition_per_person": {
               "intake": {
-                "kcal": 512,
-                "protein_g": 79.6,
-                "fat_g": 12.7,
-                "carbs_g": 22.0
+                "kcal": 2266,
+                "protein_g": 129.2,
+                "fat_g": 38.3,
+                "carbs_g": 361.6
               },
               "target_kcal": 880,
               "deviation_pct": {
-                "kcal": -41.9,
-                "protein": 134.1,
-                "fat": -54.7,
-                "carbs": -82.4
+                "kcal": 157.5,
+                "protein": 279.9,
+                "fat": 36.8,
+                "carbs": 189.3
               },
               "purine_level": "高嘌呤"
             },
             "constraints_applied": "过敏：鸡蛋；忌口：备孕；本轮忌口：辣；口味偏好：辣；健康需求：补叶酸、暖宫、调理月经"
           },
-          "reply_len": 320,
+          "reply_len": 188,
           "turn": 2,
           "profile_id": 50,
           "message": "一个人想吃辣，一个人一点辣都不想碰。",
           "validation": {
             "violations": [],
             "hallucinated": [],
-            "dish_count": 2,
+            "dish_count": 3,
             "ok": true
           }
         },
         {
-          "first_token_s": 1.775,
-          "total_s": 3.389,
+          "first_token_s": 1.018,
+          "total_s": 3.152,
           "plan": {
             "type": "plan",
             "meal": "晚餐",
             "people": 1,
             "dishes": [
               {
-                "id": 1728,
-                "name": "豆豉鳕鱼",
+                "id": 1440,
+                "name": "鲈鱼蒸豆腐",
                 "role": "荤菜",
-                "reason": "辣味鳕鱼补叶酸暖宫",
+                "reason": "鲈鱼补叶酸暖宫，豆腐共用",
                 "kept": false,
                 "ingredients": [
-                  "鳕鱼",
-                  "生姜",
-                  "小葱",
-                  "豆豉",
-                  "蒸鱼豉油"
+                  "鲈鱼",
+                  "嫩豆腐",
+                  "葱姜",
+                  "盐",
+                  "生抽",
+                  "糖"
                 ]
               },
               {
                 "id": 1694,
                 "name": "海带竹荪汤",
                 "role": "汤",
-                "reason": "海带竹荪汤清淡补碘",
+                "reason": "海带竹荪清淡补碘暖宫",
                 "kept": false,
                 "ingredients": [
                   "干竹荪",
@@ -2245,23 +2280,23 @@
             ],
             "nutrition_per_person": {
               "intake": {
-                "kcal": 512,
-                "protein_g": 79.6,
-                "fat_g": 12.7,
-                "carbs_g": 22.0
+                "kcal": 302,
+                "protein_g": 24.7,
+                "fat_g": 14.3,
+                "carbs_g": 19.2
               },
               "target_kcal": 880,
               "deviation_pct": {
-                "kcal": -41.9,
-                "protein": 134.1,
-                "fat": -54.7,
-                "carbs": -82.4
+                "kcal": -65.6,
+                "protein": -27.5,
+                "fat": -48.8,
+                "carbs": -84.7
               },
-              "purine_level": "高嘌呤"
+              "purine_level": "中嘌呤"
             },
             "constraints_applied": "过敏：鸡蛋；忌口：备孕；本轮忌口：辣；口味偏好：辣；健康需求：补叶酸、暖宫、调理月经"
           },
-          "reply_len": 312,
+          "reply_len": 183,
           "turn": 3,
           "profile_id": 50,
           "message": "最好大部分食材能共用，我不想分开做两套，主菜可以考虑鱼或者鸡",
@@ -2273,76 +2308,94 @@
           }
         },
         {
-          "first_token_s": 1.71,
-          "total_s": 3.792,
+          "first_token_s": 0.751,
+          "total_s": 2.878,
           "plan": {
             "type": "plan",
             "meal": "晚餐",
             "people": 1,
             "dishes": [
               {
-                "id": 1728,
-                "name": "豆豉鳕鱼",
+                "id": 1440,
+                "name": "鲈鱼蒸豆腐",
                 "role": "荤菜",
-                "reason": "辣味鳕鱼补叶酸暖宫",
+                "reason": "鲈鱼补叶酸暖宫，豆腐共用",
                 "kept": true,
                 "ingredients": [
-                  "鳕鱼",
-                  "生姜",
-                  "小葱",
-                  "豆豉",
-                  "蒸鱼豉油"
+                  "鲈鱼",
+                  "嫩豆腐",
+                  "葱姜",
+                  "盐",
+                  "生抽",
+                  "糖"
                 ]
               },
               {
-                "id": 1677,
-                "name": "豆腐蒸黄鱼",
+                "id": 622,
+                "name": "蛤蜊蘑菇鸡",
                 "role": "荤菜",
+                "reason": "辣味鸡肉蛤蜊，补铁暖宫",
+                "kept": false,
+                "ingredients": [
+                  "食用油",
+                  "蒜粒",
+                  "姜粒",
+                  "洋葱",
+                  "鸡肉",
+                  "生抽",
+                  "老抽",
+                  "蚝油"
+                ]
+              },
+              {
+                "id": 429,
+                "name": "菠菜粉丝汤",
+                "role": "素菜",
                 "reason": "补位搭配",
                 "kept": false,
                 "ingredients": [
-                  "黄鱼",
-                  "豆腐",
-                  "青红椒丝",
+                  "高汤块",
+                  "粉丝",
                   "姜丝",
-                  "葱花",
-                  "盐",
-                  "鸡粉",
-                  "蒸鱼豉油"
+                  "海米",
+                  "水",
+                  "菠菜",
+                  "白胡椒粉",
+                  "香葱"
                 ]
               }
             ],
             "nutrition_per_person": {
               "intake": {
-                "kcal": 680,
-                "protein_g": 114.5,
-                "fat_g": 19.4,
-                "carbs_g": 13.6
+                "kcal": 913,
+                "protein_g": 72.0,
+                "fat_g": 37.6,
+                "carbs_g": 72.4
               },
               "target_kcal": 880,
               "deviation_pct": {
-                "kcal": -22.7,
-                "protein": 236.7,
-                "fat": -30.7,
-                "carbs": -89.1
+                "kcal": 3.8,
+                "protein": 111.7,
+                "fat": 34.3,
+                "carbs": -42.1
               },
               "purine_level": "高嘌呤"
             },
             "constraints_applied": "过敏：鸡蛋；忌口：备孕；本轮忌口：辣、麻；口味偏好：辣；健康需求：补叶酸、暖宫、调理月经"
           },
-          "reply_len": 383,
+          "reply_len": 210,
           "turn": 4,
           "profile_id": 50,
           "message": "然后整体别超过45分钟，太麻烦的不行。",
           "validation": {
             "violations": [],
             "hallucinated": [],
-            "dish_count": 2,
+            "dish_count": 3,
             "ok": true
           }
         }
       ],
-      "case_avg_s": 3.396
+      "case_avg_s": 3.006
     }
   ],
   "thresholds": {

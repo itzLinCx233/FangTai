@@ -13,7 +13,7 @@ from app.core.recipe_store import (
 )
 from app.core.constraint_engine import ProfileConstraints, merge_constraints
 from app.core.nutrition import recipe_nutrition, balance_report
-from app.core.profiles import load_profiles
+from app.core.profiles import load_profiles, get_profile
 from app.core.planner import build_combo, default_dish_count
 from app.core import dialog as dlg
 
@@ -113,6 +113,29 @@ def test_estimate_minutes():
     print(f"test_estimate_minutes ✓ ({len(fast)} 道菜 30 分钟内)")
 
 
+def test_dialog_constraint_priority():
+    store = get_store()
+    # 会话忌口被后续轮次正向口味解除（最新对话优先于旧约束）
+    s = dlg.DialogSession()
+    s.apply_slots(dlg.rule_slots("安排晚饭，别做辣的"))
+    assert "辣" in s.constraints.extra_banned
+    s.apply_slots(dlg.rule_slots("还是来点辣的吧"))
+    assert "辣" not in s.constraints.extra_banned
+    assert s.constraints.taste_pref == "辣"
+    # 档案过敏不因对话"想吃"解除（赛题零违反口径）
+    s2 = dlg.DialogSession()
+    s2.set_profiles([1], get_profile)  # user1 海鲜过敏
+    s2.apply_slots(dlg.rule_slots("今天就馋鱼，安排一条"))
+    assert not s2.constraints.ok(store.find_by_name("家常鲈鱼")[0])
+    # remove_banned 只解除会话忌口，疾病忌口保留
+    c = ProfileConstraints.from_profile(load_profiles()[5])  # user5 高尿酸+高血压
+    c.add_banned(["辣"])
+    c.remove_banned("辣")
+    assert c.extra_banned == []
+    assert "高尿酸" in c.taboo_keys
+    print("test_dialog_constraint_priority ✓")
+
+
 if __name__ == "__main__":
     test_recipe_store()
     test_constraint_engine()
@@ -120,4 +143,5 @@ if __name__ == "__main__":
     test_planner()
     test_dialog_rules()
     test_estimate_minutes()
+    test_dialog_constraint_priority()
     print("\n全部通过 ✓")

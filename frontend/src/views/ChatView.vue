@@ -243,6 +243,7 @@ async function send() {
   items.value.push(ai)
   const t0 = performance.now()
   let firstTok: number | null = null
+  let hasPlan = false
   try {
     const resp = await fetch('/api/chat', {
       method: 'POST',
@@ -264,10 +265,15 @@ async function send() {
         if (!raw.startsWith('data: ')) continue
         let ev: any
         try { ev = JSON.parse(raw.slice(6)) } catch { continue }
-        if (ev.type === 'plan') items.value.push({ type: 'plan', plan: ev })
-        else if (ev.type === 'delta') {
+        if (ev.type === 'plan') {
+          // 方案卡片即本轮回复：出卡即移除文字气泡（前导句只是选菜期间的过渡显示）
+          hasPlan = true
+          items.value.push({ type: 'plan', plan: ev })
+          const i = items.value.indexOf(ai)
+          if (i >= 0) items.value.splice(i, 1)
+        } else if (ev.type === 'delta') {
           if (firstTok === null) firstTok = performance.now() - t0
-          ai.text += ev.text
+          if (!hasPlan) ai.text += ev.text
         } else if (ev.type === 'clarify') {
           // 澄清问题随后会以 delta 流式下发，这里不重复拼接
         } else if (ev.type === 'done') {
@@ -275,6 +281,10 @@ async function send() {
         }
         scrollBottom()
       }
+    }
+    if (hasPlan) {
+      const i = items.value.indexOf(ai)
+      if (i >= 0) items.value.splice(i, 1)
     }
     ai.done = true
   } catch (e: any) {

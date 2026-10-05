@@ -538,6 +538,10 @@ class MealAgent:
             ],
             "nutrition_per_person": balance,
             "constraints_applied": session.constraints.summary(),
+            # 标题栏"忌口"展示用：过敏+疾病忌口+会话忌口合并
+            "taboos": sorted(set(session.constraints.allergens)
+                             | set(session.constraints.taboo_keys)
+                             | set(session.constraints.extra_banned)),
         }
 
     @staticmethod

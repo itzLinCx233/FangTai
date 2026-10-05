@@ -511,7 +511,7 @@ main { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: 
 .bubble.typing::after { content: '●●●'; color: var(--muted); animation: blink 1.2s infinite; letter-spacing: 2px; font-size: 10px }
 @keyframes blink { 0%, 80%, 100% { opacity: .25 } 40% { opacity: 1 } }
 .plan-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; max-width: 620px; width: 100%; margin: 0 auto }
-.plan-card h4 { font-size: 13px; color: var(--primary); margin-bottom: 10px }
+.plan-card h4 { font-size: 17px; color: var(--primary); margin-bottom: 10px }
 .dishes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px }
 .dish { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: #fbfcfd }
 .dish.soup { background: #fff8e1; border-color: #f0e0a8 }

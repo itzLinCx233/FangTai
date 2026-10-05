@@ -1,30 +1,47 @@
 <template>
   <div class="chat-page">
-    <!-- 顶栏：用户中心（原健康档案下拉位置） -->
-    <header>
-      <div class="logo">🍲</div>
-      <div>
-        <h1>个性化膳食规划 Agent</h1>
-        <div class="sub">方太 AI 专项赛 · RAG + 多约束推理 + 营养估算</div>
+    <!-- 左侧边栏：品牌 / 新对话 / 历史记录 / 账号 -->
+    <aside class="side" :class="{ collapsed: sideCollapsed }">
+      <div class="side-top">
+        <div class="brand">
+          <span class="s-logo">🍲</span>
+          <span class="s-name" v-show="!sideCollapsed">个性化膳食规划 Agent</span>
+        </div>
+        <button class="icon-btn" :title="sideCollapsed ? '展开侧边栏' : '收起侧边栏'" @click="toggleSide">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <rect x="1.5" y="2.5" width="13" height="11" rx="2.5" stroke="currentColor" stroke-width="1.4"/>
+            <line x1="10.5" y1="2.5" x2="10.5" y2="13.5" stroke="currentColor" stroke-width="1.4"/>
+          </svg>
+        </button>
       </div>
-      <div class="spacer"></div>
-      <div class="controls">
-        <button class="btn" @click="newChat">新对话</button>
-        <div class="user-box">
-            <div class="avatar" :class="{ admin: auth.isAdmin }" @click="menuOpen = !menuOpen">
-              {{ avatarChar }}
-            </div>
-            <div class="user-name" @click="menuOpen = !menuOpen">{{ auth.user!.nickname || auth.user!.username }}</div>
-            <div class="user-menu" v-show="menuOpen">
-              <a @click="openCenter">个人中心</a>
-              <a v-if="auth.isAdmin" @click="goAdmin">管理后台</a>
-              <div class="sep"></div>
-              <a class="logout" @click="doLogout">退出登录</a>
-            </div>
-          </div>
+      <button class="new-chat" title="开启新对话" @click="newChat">
+        <span class="plus">＋</span><span v-show="!sideCollapsed">开启新对话</span>
+      </button>
+      <div class="hist" v-show="!sideCollapsed">
+        <template v-for="[label, arr] in groupedSessions" :key="label">
+          <div class="g-title">{{ label }}</div>
+          <div class="h-item" v-for="s in arr" :key="s.session_id" :class="{ active: sessionId === s.session_id }"
+               :title="s.title" @click="openHistory(s)">{{ s.title || '（未命名会话）' }}</div>
+        </template>
+        <div v-if="auth.user && groupedSessions.length === 0" class="h-empty">暂无历史对话</div>
       </div>
-    </header>
+      <div class="side-bottom">
+        <div class="acct" @click="menuOpen = !menuOpen">
+          <div class="avatar" :class="{ admin: auth.isAdmin }">{{ avatarChar }}</div>
+          <span class="a-name" v-show="!sideCollapsed">{{ auth.user!.nickname || auth.user!.username }}</span>
+          <span class="dots" v-show="!sideCollapsed">···</span>
+        </div>
+        <div class="user-menu" v-show="menuOpen">
+          <a @click="openCenter">个人中心</a>
+          <a v-if="auth.isAdmin" @click="goAdmin">管理后台</a>
+          <div class="sep"></div>
+          <a class="logout" @click="doLogout">退出登录</a>
+        </div>
+      </div>
+    </aside>
 
+    <!-- 主区：消息 + 输入 -->
+    <div class="main-col">
     <!-- 消息区 -->
     <main ref="chatMain">
       <div class="welcome" v-if="items.length === 0">
@@ -65,6 +82,7 @@
       </div>
       <div class="stats">{{ statsLine }}</div>
     </footer>
+    </div><!-- /main-col -->
 
     <!-- 个人中心模态框 -->
     <div class="modal-mask" v-if="ucMask" @click.self="ucMask = false">
@@ -76,7 +94,7 @@
               性别：{{ auth.user.gender || '保密' }} ｜ 生日：{{ auth.user.birthday || '保密' }} ｜
               身高：{{ auth.user.height_cm ? auth.user.height_cm + 'cm' : '保密' }} ｜
               体重：{{ auth.user.weight_kg ? auth.user.weight_kg + 'kg' : '保密' }}<br>
-              忌口：{{ auth.user.taboo || '无' }} ｜ 注册时间：{{ auth.user.created_at }}</div>
+              忌口：{{ auth.user.taboo || '无' }} ｜ 居住地：{{ auth.user.city || '保密' }} ｜ 注册时间：{{ auth.user.created_at }}</div>
           </div>
           <div class="uc-section"><h4>👤 资料设置</h4>
             <div class="form-item"><label>昵称</label><input v-model="uc.nick"></div>
@@ -91,17 +109,17 @@
               <input type="date" v-model="uc.birthday" max="today-max">
               <div class="hint">用于推算年龄（0-100 岁）；不填视为保密</div>
             </div>
-            <div class="form-item"><label>忌口（可多选，不选=无）</label>
-              <div class="check-row">
-                <label v-for="t in tabooOptions" :key="t" class="check-item">
-                  <input type="checkbox" :value="t" v-model="uc.taboo">{{ t }}
-                </label>
-              </div>
-              <div class="hint">推荐时将自动规避所勾选的忌口食材</div>
+            <div class="form-item"><label>忌口</label>
+              <input type="text" v-model="uc.taboo" maxlength="100" placeholder="如：海鲜、辣、香菜">
+              <div class="hint">多个用「、」隔开，不填视为无；推荐时自动规避</div>
             </div>
             <div class="form-item two-col">
-              <div><label>身高 cm（可选）</label><input type="number" v-model.number="uc.height_cm" min="1" max="250" placeholder="保密"></div>
-              <div><label>体重 kg（可选）</label><input type="number" v-model.number="uc.weight_kg" min="1" max="300" placeholder="保密"></div>
+              <div><label>身高（cm，可选）</label><input type="number" v-model.number="uc.height_cm" min="1" max="250" placeholder="如 175"></div>
+              <div><label>体重（kg，可选）</label><input type="number" v-model.number="uc.weight_kg" min="1" max="300" placeholder="如 65"></div>
+            </div>
+            <div class="form-item"><label>居住地（可选）</label>
+              <input type="text" v-model="uc.city" maxlength="32" placeholder="如：浙江杭州">
+              <div class="hint">不填视为保密</div>
             </div>
             <div class="form-item"><label>同餐人档案（多人宴请，可多选）</label>
               <select v-model="uc.companions" multiple>
@@ -154,52 +172,56 @@
       </div>
     </div>
 
-    <!-- 首次登录：完善个人信息 -->
-    <div class="modal-mask" v-if="obShow">
-      <div class="modal">
-        <div class="modal-head"><h3>完善个人信息</h3></div>
-        <div class="modal-body">
-          <p class="ob-tip">初次见面！简单介绍一下自己，推荐会更懂你（生日与性别用于营养目标测算）</p>
-          <div class="err">{{ obErr }}</div>
-          <div class="form-item">
-            <label>性别 <span class="req">*</span></label>
-            <div class="radio-row">
-              <label v-for="g in ['男', '女', '保密']" :key="g" class="radio-item">
-                <input type="radio" :value="g" v-model="ob.gender">{{ g }}
-              </label>
+    <!-- 首次登录：完善个人信息（登录后过渡进入） -->
+    <Transition name="ob">
+      <div class="modal-mask ob-mask" v-if="obShow">
+        <div class="modal">
+          <div class="modal-head"><h3>完善个人信息</h3></div>
+          <div class="modal-body">
+            <p class="ob-tip">初次见面！简单介绍一下自己，推荐会更懂你（生日与性别用于营养目标测算）</p>
+            <div class="err">{{ obErr }}</div>
+            <div class="form-item">
+              <label>性别 <span class="req">*</span></label>
+              <div class="radio-row">
+                <label v-for="g in ['男', '女', '保密']" :key="g" class="radio-item">
+                  <input type="radio" :value="g" v-model="ob.gender">{{ g }}
+                </label>
+              </div>
             </div>
-          </div>
-          <div class="form-item">
-            <label>生日 <span class="req">*</span></label>
-            <input type="date" v-model="ob.birthday">
-            <div class="hint">年龄须在 0-100 岁之间{{ obAge !== null ? '（当前 ' + obAge + ' 岁）' : '' }}</div>
-          </div>
-          <div class="form-item">
-            <label>忌口（可多选，不选默认无）</label>
-            <div class="check-row">
-              <label v-for="t in tabooOptions" :key="t" class="check-item">
-                <input type="checkbox" :value="t" v-model="ob.taboo">{{ t }}
-              </label>
+            <div class="form-item">
+              <label>生日 <span class="req">*</span></label>
+              <input type="date" v-model="ob.birthday">
+              <div class="hint">年龄须在 0-100 岁之间{{ obAge !== null ? '（当前 ' + obAge + ' 岁）' : '' }}</div>
             </div>
-          </div>
-          <div class="form-item two-col">
-            <div><label>身高 cm（可选）</label><input type="number" v-model.number="ob.height_cm" min="1" max="250" placeholder="保密"></div>
-            <div><label>体重 kg（可选）</label><input type="number" v-model.number="ob.weight_kg" min="1" max="300" placeholder="保密"></div>
-          </div>
-          <div class="ob-actions">
-            <button class="btn" @click="skipOnboard">暂时跳过</button>
-            <button class="btn primary" :disabled="obLoading" @click="finishOnboard">{{ obLoading ? '保存中…' : '完成' }}</button>
+            <div class="form-item">
+              <label>忌口（可选）</label>
+              <input type="text" v-model="ob.taboo" maxlength="100" placeholder="如：海鲜、辣、香菜">
+              <div class="hint">多个用「、」隔开，不填视为无；推荐时自动规避</div>
+            </div>
+            <div class="form-item two-col">
+              <div><label>身高（cm，可选）</label><input type="number" v-model.number="ob.height_cm" min="1" max="250" placeholder="如 175"></div>
+              <div><label>体重（kg，可选）</label><input type="number" v-model.number="ob.weight_kg" min="1" max="300" placeholder="如 65"></div>
+            </div>
+            <div class="form-item">
+              <label>居住地（可选）</label>
+              <input type="text" v-model="ob.city" maxlength="32" placeholder="如：浙江杭州">
+              <div class="hint">不填视为保密</div>
+            </div>
+            <div class="ob-actions">
+              <button class="btn" @click="skipOnboard">暂时跳过</button>
+              <button class="btn primary" :disabled="obLoading" @click="finishOnboard">{{ obLoading ? '保存中…' : '完成' }}</button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </Transition>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { api, getToken, profileLabel, type Profile } from '../api'
-import { useAuth, TABOO_OPTIONS } from '../stores/auth'
+import { useAuth } from '../stores/auth'
 
 const router = useRouter()
 const auth = useAuth()
@@ -282,11 +304,13 @@ function currentProfileIds(): number[] {
 async function send() {
   const text = input.value.trim()
   if (!text || busy.value) return
+  const isNewChat = sessionId.value === null
   busy.value = true
   input.value = ''
   items.value.push({ type: 'msg', role: 'user', text, done: true })
-  const ai = { type: 'msg' as const, role: 'ai' as const, text: '', done: false }
-  items.value.push(ai)
+  items.value.push({ type: 'msg', role: 'ai', text: '', done: false })
+  const aiIdx = items.value.length - 1
+  const aiObj: any = items.value[aiIdx]   // 响应式代理：直接改原始对象不会触发渲染
   const t0 = performance.now()
   let firstTok: number | null = null
   let hasPlan = false
@@ -315,13 +339,13 @@ async function send() {
           // 方案卡片即本轮回复：出卡即移除文字气泡（前导句只是选菜期间的过渡显示）
           hasPlan = true
           items.value.push({ type: 'plan', plan: ev })
-          const i = items.value.indexOf(ai)
+          const i = items.value.indexOf(aiObj)
           if (i >= 0) items.value.splice(i, 1)
           // 必须取 items 内的响应式代理再改 reason，否则视图不刷新（占位会一直挂着）
           fillEmptyReasons((items.value[items.value.length - 1] as any).plan)
         } else if (ev.type === 'delta') {
           if (firstTok === null) firstTok = performance.now() - t0
-          if (!hasPlan) ai.text += ev.text
+          if (!hasPlan) aiObj.text += ev.text
         } else if (ev.type === 'clarify') {
           // 澄清问题随后会以 delta 流式下发，这里不重复拼接
         } else if (ev.type === 'done') {
@@ -331,17 +355,39 @@ async function send() {
       }
     }
     if (hasPlan) {
-      const i = items.value.indexOf(ai)
+      const i = items.value.indexOf(aiObj)
       if (i >= 0) items.value.splice(i, 1)
     }
-    ai.done = true
+    aiObj.done = true
   } catch (e: any) {
-    ai.text = '出错了：' + e.message
-    ai.done = true
-  } finally { busy.value = false; scrollBottom() }
+    aiObj.text = '出错了：' + e.message
+    aiObj.done = true
+  } finally { busy.value = false; scrollBottom(); if (isNewChat) loadSessions() }
 }
 
-function newChat() { sessionId.value = null; items.value = []; statsLine.value = '' }
+const OPENING_TEXT = '您好！很高兴为您服务 🥗\n开始规划之前，先了解一下您的需求：\n1. 想吃哪一餐？（早餐 / 午餐 / 晚餐 / 夜宵）\n2. 几个人吃？\n3. 有忌口或过敏吗？（如海鲜、辣、花生…）\n4. 其他要求也可以告诉我，比如：想减脂增肌、半小时内搞定、家里只剩番茄鸡蛋土豆等食材'
+
+/* AI 主动发起开场对话（打字机效果；经 reactive 代理赋值确保逐字渲染） */
+function aiOpening() {
+  items.value.push({ type: 'msg', role: 'ai', text: '', done: false })
+  const idx = items.value.length - 1
+  const total = OPENING_TEXT.length
+  const t0 = Date.now()
+  const timer = setInterval(() => {
+    const cur: any = items.value[idx]
+    if (!cur) { clearInterval(timer); return }
+    // 按已流逝时间计算应显示的字符数，标签页被节流也能追上进度
+    const n = Math.min(total, Math.ceil((Date.now() - t0) / 18))
+    cur.text = OPENING_TEXT.slice(0, n)
+    scrollBottom()
+    if (n >= total) { cur.done = true; clearInterval(timer) }
+  }, 40)
+}
+
+function newChat() {
+  sessionId.value = null; items.value = []; statsLine.value = ''
+  aiOpening()
+}
 
 function doLogout() {
   menuOpen.value = false
@@ -352,11 +398,42 @@ function goAdmin() { menuOpen.value = false; router.push('/admin') }
 
 /* ---------- 个人中心 ---------- */
 const ucMask = ref(false)
-const tabooOptions = TABOO_OPTIONS
-const uc = ref({ nick: '', companions: [] as number[], gender: '保密', birthday: '', taboo: [] as string[], height_cm: null as number | null, weight_kg: null as number | null })
+const uc = ref({ nick: '', companions: [] as number[], gender: '保密', birthday: '', taboo: '', city: '', height_cm: null as number | null, weight_kg: null as number | null })
 const pw = ref({ old: '', new: '' })
 const ucSessions = ref<any[]>([])
 const sessionView = ref<any[]>([])
+
+/* ---------- 左侧边栏 ---------- */
+const sideCollapsed = ref(localStorage.getItem('ft_side_collapsed') === '1')
+function toggleSide() {
+  sideCollapsed.value = !sideCollapsed.value
+  localStorage.setItem('ft_side_collapsed', sideCollapsed.value ? '1' : '0')
+}
+const groupedSessions = computed<[string, any[]][]>(() => {
+  const buckets: Record<string, any[]> = { '7 天内': [], '30 天内': [], '更早': [] }
+  const now = Date.now()
+  for (const s of ucSessions.value) {
+    const t = new Date(String(s.created_at || '').replace(' ', 'T')).getTime()
+    const days = (now - (isNaN(t) ? now : t)) / 86400000
+    if (days <= 7) buckets['7 天内'].push(s)
+    else if (days <= 30) buckets['30 天内'].push(s)
+    else buckets['更早'].push(s)
+  }
+  return Object.entries(buckets).filter(([, arr]) => arr.length > 0)
+})
+async function loadSessions() {
+  try { ucSessions.value = (await api<any>('/api/auth/sessions')).items } catch { /* ignore */ }
+}
+async function openHistory(s: any) {
+  menuOpen.value = false
+  sessionId.value = s.session_id
+  items.value = []
+  try {
+    const d = await api<any>(`/api/auth/sessions/${s.session_id}/messages`)
+    for (const m of d.items) items.value.push({ type: 'msg', role: m.role === 'user' ? 'user' : 'ai', text: m.content, done: true })
+  } catch { /* ignore */ }
+  scrollBottom()
+}
 
 async function openCenter() {
   menuOpen.value = false
@@ -364,7 +441,8 @@ async function openCenter() {
   uc.value.nick = u.nickname || ''
   uc.value.gender = u.gender || '保密'
   uc.value.birthday = u.birthday || ''
-  uc.value.taboo = u.taboo ? u.taboo.split('、') : []
+  uc.value.taboo = u.taboo || ''
+  uc.value.city = u.city || ''
   uc.value.height_cm = u.height_cm || null
   uc.value.weight_kg = u.weight_kg || null
   uc.value.companions = [...companions.value]
@@ -387,6 +465,7 @@ async function saveProfile() {
       gender: uc.value.gender || '保密',
       birthday: uc.value.birthday || '',
       taboo: uc.value.taboo,
+      city: uc.value.city,
       height_cm: uc.value.height_cm || null,
       weight_kg: uc.value.weight_kg || null,
     }),
@@ -411,7 +490,7 @@ async function changePassword() {
 const obShow = ref(false)
 const obLoading = ref(false)
 const obErr = ref('')
-const ob = ref({ gender: '', birthday: '', taboo: [] as string[], height_cm: null as number | null, weight_kg: null as number | null })
+const ob = ref({ gender: '', birthday: '', taboo: '', city: '', height_cm: null as number | null, weight_kg: null as number | null })
 
 const obAge = computed<number | null>(() => {
   if (!ob.value.birthday) return null
@@ -438,7 +517,7 @@ function maybeShowOnboard() {
   // 跳过按账号持久化（localStorage）：刷新/重开不再反复弹；仍可从个人中心补填
   if (localStorage.getItem(obDismissKey())) return
   ob.value = { gender: auth.user!.gender || '', birthday: auth.user!.birthday || '',
-               taboo: auth.user!.taboo ? auth.user!.taboo.split('、') : [],
+               taboo: auth.user!.taboo || '', city: auth.user!.city || '',
                height_cm: auth.user!.height_cm || null, weight_kg: auth.user!.weight_kg || null }
   obShow.value = true
 }
@@ -463,13 +542,14 @@ async function finishOnboard() {
         gender: ob.value.gender,
         birthday: ob.value.birthday,
         taboo: ob.value.taboo,
+        city: ob.value.city,
         height_cm: ob.value.height_cm || null,
         weight_kg: ob.value.weight_kg || null,
       }),
     })
     await auth.refresh()
     obShow.value = false
-    pushSystem('个人信息已完善' + (ob.value.taboo.length ? '，忌口（' + ob.value.taboo.join('、') + '）将在推荐中自动规避' : ''))
+    pushSystem('个人信息已完善' + (ob.value.taboo.trim() ? '，忌口（' + ob.value.taboo.trim() + '）将在推荐中自动规避' : ''))
   } catch (e: any) { obErr.value = e.message }
   finally { obLoading.value = false }
 }
@@ -477,6 +557,7 @@ async function finishOnboard() {
 onMounted(async () => {
   await auth.refresh()
   maybeShowOnboard()
+  loadSessions()
   try {
     const d = await fetch('/api/profiles?kind=simple').then(r => r.json())
     profiles.value = d.items
@@ -485,23 +566,59 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.chat-page { height: 100%; display: flex; flex-direction: column }
-header { background: var(--card); border-bottom: 1px solid var(--border); padding: 14px 24px; display: flex; align-items: center; gap: 14px; }
-header .logo { width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, var(--primary), #1a9b7e); display: flex; align-items: center; justify-content: center; font-size: 20px }
-header h1 { font-size: 17px; font-weight: 600 }
-header .sub { font-size: 12px; color: var(--muted) }
-.spacer { flex: 1 }
-.controls { display: flex; gap: 10px; align-items: center }
-.user-box { position: relative; display: flex; align-items: center; gap: 8px }
-.avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #5470c6, #7a90da); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; cursor: pointer; user-select: none }
+.chat-page { height: 100%; display: flex; flex-direction: row }
+
+/* ---------- 左侧边栏（深色，参考 DeepSeek 风格） ---------- */
+.side {
+  width: 264px; flex-shrink: 0; display: flex; flex-direction: column;
+  background: #1f2529; transition: width .22s ease; overflow: hidden;
+}
+.side.collapsed { width: 64px }
+.side-top { display: flex; align-items: center; justify-content: space-between; padding: 14px 12px 8px }
+.side.collapsed .side-top { flex-direction: column; gap: 10px; padding: 14px 8px 8px }
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0 }
+.s-logo { width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0; background: linear-gradient(135deg, var(--primary), #1a9b7e); display: flex; align-items: center; justify-content: center; font-size: 18px }
+.s-name { color: #f0f3f5; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.icon-btn { color: #9aa3ab; background: none; border: none; cursor: pointer; padding: 6px; border-radius: 8px; display: flex; align-items: center; flex-shrink: 0 }
+.icon-btn:hover { background: rgba(255, 255, 255, .08); color: #fff }
+.new-chat {
+  margin: 8px 12px 10px; padding: 10px 14px; border: none; border-radius: 999px;
+  background: #343c43; color: #f0f3f5; font-size: 13.5px; cursor: pointer;
+  display: flex; align-items: center; gap: 8px; justify-content: center;
+  transition: background .15s ease;
+}
+.new-chat:hover { background: #3f4850 }
+.new-chat .plus { font-size: 15px; line-height: 1 }
+.side.collapsed .new-chat { margin: 8px auto 10px; width: 40px; height: 40px; padding: 0; border-radius: 50% }
+.hist { flex: 1; overflow-y: auto; padding: 0 10px 8px }
+.hist::-webkit-scrollbar { width: 6px }
+.hist::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .12); border-radius: 3px }
+.g-title { color: #8b949c; font-size: 12px; padding: 12px 8px 6px }
+.h-item {
+  color: #c8cdd3; font-size: 13.5px; padding: 8px 10px; border-radius: 8px; cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.h-item:hover { background: rgba(255, 255, 255, .07) }
+.h-item.active { background: rgba(255, 255, 255, .1); color: #fff }
+.h-empty { color: #7d868e; font-size: 12.5px; text-align: center; padding: 22px 0 }
+.side-bottom { position: relative; padding: 10px 10px 14px }
+.acct { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 10px; cursor: pointer }
+.acct:hover { background: rgba(255, 255, 255, .06) }
+.side.collapsed .acct { justify-content: center; padding: 7px 0 }
+.a-name { color: #e8ecef; font-size: 13px; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.dots { color: #9aa3ab; font-size: 13px; letter-spacing: 1px }
+.side .user-menu { top: auto; bottom: 56px; left: 10px; right: 10px; min-width: 0 }
+
+/* ---------- 主区 ---------- */
+.main-col { flex: 1; min-width: 0; display: flex; flex-direction: column }
+main { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 18px }
+.avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #5470c6, #7a90da); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; cursor: pointer; user-select: none; flex-shrink: 0 }
 .avatar.admin { background: linear-gradient(135deg, var(--accent), #f0b95f) }
-.user-name { font-size: 13px; font-weight: 500; cursor: pointer }
-.user-menu { position: absolute; right: 0; top: 44px; background: #fff; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.1); min-width: 150px; padding: 6px; z-index: 30 }
-.user-menu a { display: block; padding: 9px 12px; border-radius: 7px; font-size: 13px; cursor: pointer }
+.user-menu { position: absolute; background: #fff; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.18); min-width: 150px; padding: 6px; z-index: 30 }
+.user-menu a { display: block; padding: 9px 12px; border-radius: 7px; font-size: 13px; cursor: pointer; color: var(--text) }
 .user-menu a:hover { background: var(--primary-light); color: var(--primary) }
 .user-menu .logout { color: var(--danger) }
 .user-menu .sep { height: 1px; background: var(--border); margin: 4px 6px }
-main { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 18px }
 .msg { display: flex; gap: 12px; max-width: 860px; width: 100%; margin: 0 auto }
 .msg .avatar-c { width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 15px; color: #fff; background: var(--primary) }
 .msg.user .avatar-c { background: #5470c6 }
@@ -563,7 +680,7 @@ textarea:focus { border-color: var(--primary) }
 .form-item label { display: block; font-size: 13px; color: #4a5361; margin-bottom: 6px }
 .form-item input, .form-item select { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; outline: none; font-family: inherit }
 .form-item select[multiple] { height: auto; min-height: 96px }
-.form-item .hint { font-size: 12px; color: var(--muted); margin-top: 4px }
+.form-item .hint { font-size: 12px; color: #6b7480; margin-top: 5px; line-height: 1.5 }
 .err { color: var(--danger); font-size: 13px; min-height: 18px; margin-bottom: 8px }
 .wide-btn { width: 100%; padding: 10px }
 .uc-section { margin-bottom: 20px }
@@ -580,14 +697,49 @@ textarea:focus { border-color: var(--primary) }
 .muted { color: var(--muted); font-size: 13px }
 
 /* 信息完善/个人中心新样式 */
-.radio-row { display: flex; gap: 18px; flex-wrap: wrap }
-.radio-item, .check-item { display: inline-flex; align-items: center; gap: 5px; font-size: 14px; cursor: pointer; color: var(--text) }
-.radio-item input, .check-item input { accent-color: var(--primary) }
-.check-row { display: flex; flex-wrap: wrap; gap: 10px 16px }
+/* 胶囊选择（性别）：点击整颗切换，选中态主题色 */
+.radio-row { display: flex; gap: 10px; flex-wrap: wrap }
+.radio-item {
+  display: inline-flex; align-items: center; gap: 0;
+  padding: 6px 16px; border-radius: 999px;
+  border: 1px solid var(--border); background: #fff;
+  font-size: 13.5px; cursor: pointer; color: #4a5361;
+  user-select: none; transition: all .15s ease; line-height: 1.4;
+}
+.radio-item:hover { border-color: var(--primary); color: var(--primary) }
+.radio-item input { position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0 }
+.radio-item:has(input:checked) {
+  background: var(--primary); border-color: var(--primary); color: #fff;
+  box-shadow: 0 2px 8px rgba(15, 111, 92, .28); font-weight: 500;
+}
+.radio-item:has(input:focus-visible) { outline: 2px solid var(--primary); outline-offset: 2px }
 .two-col { display: flex; gap: 12px }
 .two-col > div { flex: 1 }
 .two-col input { width: 100% }
-.req { color: var(--danger) }
-.ob-tip { font-size: 13px; color: var(--muted); margin-bottom: 14px; line-height: 1.6 }
-.ob-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px }
+.req { color: var(--danger); margin-left: 2px; font-weight: 600 }
+.ob-tip { font-size: 13px; color: #5d6873; margin-bottom: 16px; line-height: 1.65; background: #f4f8f6; border-left: 3px solid var(--primary); padding: 8px 12px; border-radius: 0 8px 8px 0 }
+.ob-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border) }
+
+/* 登录 → 完善个人信息：过渡动画（遮罩淡入 + 卡片升起 + 内容错峰浮现） */
+@keyframes obFadeUp { from { opacity: 0; transform: translateY(14px) } to { opacity: 1; transform: none } }
+.ob-mask { background: rgba(10, 20, 17, .5); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px) }
+.ob-enter-active { transition: opacity .32s ease }
+.ob-leave-active { transition: opacity .16s ease }
+.ob-enter-from, .ob-leave-to { opacity: 0 }
+.ob-enter-active .modal {
+  transition: transform .55s cubic-bezier(.22, 1, .36, 1), opacity .5s cubic-bezier(.22, 1, .36, 1);
+  will-change: transform, opacity;
+}
+.ob-enter-from .modal { transform: translateY(26px) scale(.96); opacity: 0 }
+.ob-leave-active .modal { transition: transform .16s ease, opacity .16s ease }
+.ob-leave-to .modal { transform: translateY(10px) scale(.985); opacity: 0 }
+.ob-enter-active .modal-head { animation: obFadeUp .5s cubic-bezier(.22, 1, .36, 1) .1s backwards }
+.ob-enter-active .ob-tip { animation: obFadeUp .5s cubic-bezier(.22, 1, .36, 1) .16s backwards }
+.ob-enter-active .form-item { animation: obFadeUp .5s cubic-bezier(.22, 1, .36, 1) backwards }
+.ob-enter-active .form-item:nth-child(3) { animation-delay: .22s }
+.ob-enter-active .form-item:nth-child(4) { animation-delay: .27s }
+.ob-enter-active .form-item:nth-child(5) { animation-delay: .32s }
+.ob-enter-active .form-item:nth-child(6) { animation-delay: .37s }
+.ob-enter-active .form-item:nth-child(7) { animation-delay: .42s }
+.ob-enter-active .ob-actions { animation: obFadeUp .5s cubic-bezier(.22, 1, .36, 1) .48s backwards }
 </style>

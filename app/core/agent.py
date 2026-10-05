@@ -242,6 +242,8 @@ class MealAgent:
             candidate_pool, session, message, 40, False)
         slots = await slots_task
         session.apply_slots(slots)
+        kept_ids: set[int] = set()
+        replace_targets: list[dlg.DishPlanItem] = []
 
         # 3.05) 换桌短语规则路由：意图分类器对"换一桌/全部换掉"易误判为 add_constraint，
         #       走"零违规不变"分支导致跨轮去重失效 → 强制 reject_all 全新选菜
@@ -288,8 +290,7 @@ class MealAgent:
             return
 
         # 3) 分支处理 → 统一得到 (plan_items, kept_ids, context_for_llm)
-        kept_ids: set[int] = set()
-        replace_targets: list[dlg.DishPlanItem] = []
+        #    （kept_ids/replace_targets 已在 3.05 前初始化、3.1 加菜分支中赋值）
 
         if slots.intent in ("smalltalk",) and not session.current_plan and "吃" not in message:
             reply = "您好！我是方太健康膳食助手，告诉我您想吃什么、几个人吃，我来为您搭配一餐～"

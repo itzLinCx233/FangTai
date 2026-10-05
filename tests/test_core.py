@@ -16,6 +16,8 @@ from app.core.nutrition import recipe_nutrition, balance_report
 from app.core.profiles import load_profiles
 from app.core.planner import build_combo, default_dish_count
 from app.core import dialog as dlg
+from app.core.agent import filter_by_meal, meal_conflict_ok, MEAL_CONFLICTS
+from app.core.recipe_store import Recipe
 
 
 def test_recipe_store():
@@ -113,6 +115,35 @@ def test_estimate_minutes():
     print(f"test_estimate_minutes ✓ ({len(fast)} 道菜 30 分钟内)")
 
 
+def _meal_recipe(rid: int, name: str, meals: list[str]) -> Recipe:
+    return Recipe(id=rid, name=name, tags={"餐次": meals})
+
+
+def test_meal_conflict_filter():
+    # 冲突映射：晚餐/午餐排除早餐，早餐排除午餐晚餐
+    assert MEAL_CONFLICTS["晚餐"] == {"早餐"}
+    assert "早餐" in MEAL_CONFLICTS["早餐"] or MEAL_CONFLICTS["早餐"] >= {"午餐", "晚餐"}
+    # 兼容判定：命中目标餐次 ✓、无标签中性 ✓、明确冲突 ✗
+    dinner = _meal_recipe(1, "红烧排骨", ["晚餐", "午餐"])
+    neutral = _meal_recipe(2, "清炒时蔬", [])
+    breakfast = _meal_recipe(3, "小米粥", ["早餐"])
+    assert meal_conflict_ok(dinner, "晚餐")
+    assert meal_conflict_ok(neutral, "晚餐")
+    assert not meal_conflict_ok(breakfast, "晚餐")
+    assert meal_conflict_ok(breakfast, "早餐")
+    assert meal_conflict_ok(dinner, None)
+    # 后过滤：晚餐池剔除早餐菜，保留中性菜
+    pool = [breakfast, dinner, neutral, _meal_recipe(4, "清蒸鱼", ["晚餐"]),
+            _meal_recipe(5, "番茄炒蛋", ["午餐"]), _meal_recipe(6, "凉拌黄瓜", ["晚餐"])]
+    kept = filter_by_meal(pool, "晚餐", need=4)
+    assert breakfast not in kept and dinner in kept and neutral in kept
+    # 剔除后严重不足（全是不兼容菜）→ 回退原池
+    scarce = [breakfast, _meal_recipe(7, "白粥", ["早餐"]), _meal_recipe(8, "豆浆", ["早餐"]),
+              _meal_recipe(9, "油条", ["早餐"]), _meal_recipe(10, "煎蛋", ["早餐"])]
+    assert filter_by_meal(scarce, "晚餐", need=4) == scarce
+    print("test_meal_conflict_filter ✓")
+
+
 if __name__ == "__main__":
     test_recipe_store()
     test_constraint_engine()
@@ -120,4 +151,5 @@ if __name__ == "__main__":
     test_planner()
     test_dialog_rules()
     test_estimate_minutes()
+    test_meal_conflict_filter()
     print("\n全部通过 ✓")

@@ -29,6 +29,22 @@ from app.core.retriever import get_retriever
 
 
 # ---------------------------------------------------------------- 候选构造
+# 餐次冲突映射：目标餐次需排除的餐次标签（无餐次标签的菜视为通用，不排除）
+MEAL_CONFLICTS: dict[str, set[str]] = {
+    "早餐": {"午餐", "晚餐"},
+    "午餐": {"早餐"},
+    "晚餐": {"早餐"},
+}
+
+
+def meal_conflict_ok(rec: Recipe, meal: str | None) -> bool:
+    """菜谱与目标餐次是否兼容：命中目标餐次标签，或不含任何冲突餐次标签。"""
+    if not meal:
+        return True
+    tags = set(rec.tags.get("餐次", []))
+    return meal in tags or not (tags & MEAL_CONFLICTS.get(meal, set()))
+
+
 def candidate_pool(session: dlg.DialogSession, query: str, need: int = 24,
                    use_label_filter: bool = True) -> list[Recipe]:
     """约束过滤 + 混合检索 → 候选菜谱池（口味为软加权，餐次为硬过滤可放宽）。"""
@@ -36,7 +52,7 @@ def candidate_pool(session: dlg.DialogSession, query: str, need: int = 24,
     ok_ids = store.filter_ids(session.constraints.banned_pattern)
     label_filter = session.label_filter() if use_label_filter else {}
     if label_filter:
-        # 标签过滤后候选不足时逐级放宽（先放宽餐次）
+        # 标签过滤后候选不足时逐级放宽（先放宽餐次；冲突餐次在检索后仍会硬排除）
         hits = {rid for rid in ok_ids if all(
             any(w in store.by_id[rid].tags.get(d, []) for w in v)
             for d, v in label_filter.items())}
@@ -52,6 +68,11 @@ def candidate_pool(session: dlg.DialogSession, query: str, need: int = 24,
         keyword_boost=boost[:12], topk=need,
     )
     pool = [r.recipe for r in results]
+    # 餐次冲突硬排除（如晚餐剔除早餐菜；无餐次标签视为通用），严重不足时回退原池
+    if session.meal:
+        strict = [r for r in pool if meal_conflict_ok(r, session.meal)]
+        if len(strict) >= max(4, need // 2):
+            pool = strict
     # 时间限制过滤
     if session.time_limit_min:
         pool = [r for r in pool if estimate_minutes(r) <= session.time_limit_min] or pool
@@ -59,19 +80,20 @@ def candidate_pool(session: dlg.DialogSession, query: str, need: int = 24,
 
 
 def filter_by_meal(pool: list[Recipe], meal: str | None, need: int) -> list[Recipe]:
-    """并行粗检索后的餐次后过滤；不足时保留原池。"""
+    """并行粗检索后的餐次后过滤：剔除与目标餐次明确冲突的菜（如晚餐剔除早餐菜），
+    无餐次标签视为通用保留；剔除后严重不足时回退原池。"""
     if not meal:
         return pool
-    filt = [r for r in pool if meal in r.tags.get("餐次", [])]
+    filt = [r for r in pool if meal_conflict_ok(r, meal)]
     return filt if len(filt) >= max(4, need // 2) else pool
 
 
 # ---------------------------------------------------------------- 选菜（零幻觉）
 SELECT_SYS = """你是膳食选菜引擎。只允许从候选列表中选菜，绝不使用列表外的菜。
-输出严格 JSON：{"dishes":[{"id":候选id,"role":"主菜|荤菜|素菜|蛋类|豆制品|汤|主食|小菜","reason":"≤12字理由"}]}
+输出严格 JSON：{"dishes":[{"id":候选id,"role":"主菜|荤菜|素菜|蛋类|豆制品|汤|主食|小菜","reason":"≤14字理由，点出与用户口味/健康需求/忌口的关联"}]}
 要求：
 1. 严格满足每个人的忌口/过敏（候选已过滤，仍需复核）
-2. 荤素搭配合理，优先照顾用户健康需求与口味
+2. 荤素搭配合理，优先照顾用户健康需求与口味；理由需说清该菜照顾了谁（如"低脂适合减脂""软烂适合老人"）
 3. 菜数等于要求数量，不许多选
 4. 除用户明确要求多汤外，全桌至多 1 道汤，其余选炒/蒸/烤/拌等菜品
 5. 兼顾整桌营养均衡：避免多道高热量菜（油炸/五花肉/芝士类）叠加，素菜不过半也不可或缺
@@ -410,7 +432,11 @@ class MealAgent:
             tags = "、".join(rec.tag_list[:8]) if rec else ""
             ings = "、".join(i.name for i in rec.ingredients[:8]) if rec else ""
             mark = "（沿用上轮，用户已确认）" if d.recipe_id in kept_ids and d.locked else ""
-            dish_lines.append(f"- {d.name}［{d.role}］{mark}｜食材：{ings}｜特点：{tags}｜理由：{d.reason}")
+            method = rec.category.get("cook_method", "") if rec else ""
+            first_step = (rec.steps[0][:40] + "…") if rec and rec.steps else ""
+            dish_lines.append(
+                f"- {d.name}［{d.role}］{mark}｜食材：{ings}｜特点：{tags}｜"
+                f"做法概要：{method}{'，' if method and first_step else ''}{first_step}｜理由：{d.reason}")
         profile_lines = [profile_text(pid) for pid in session.profile_ids]
         replaced_note = ""
         if replaced:
@@ -419,7 +445,8 @@ class MealAgent:
         nut = balance["intake"]
         rules = [
             "1. 只能提及方案中列出的菜品，严禁编造菜名或食材",
-            "2. 每道菜一句话理由，结合用户健康需求/口味/忌口说明",
+            "2. 每道菜一句话理由：结合用餐人档案（健康需求/忌口/口味/人数/餐次）说明为什么选它，"
+            "并带一句做法概要（参考给定做法概要，烹饪方式+关键步骤，不得编造步骤）",
             "3. 营养数据必须引用给定数值，不要自己计算",
             "4. 300字以内，分节可用小标题或 emoji，语气亲切专业，结尾给一句贴心提示",
         ]
@@ -457,19 +484,18 @@ class MealAgent:
     # ---------------------------------------------------------------- 辅助
     def _plan_payload(self, session: dlg.DialogSession, balance: dict) -> dict:
         store = get_store()
+        dishes = []
+        for d in session.current_plan:
+            rec = store.get(d.recipe_id)
+            dishes.append({
+                "id": d.recipe_id, "name": d.name, "role": d.role,
+                "reason": d.reason, "kept": d.locked,
+                "ingredients": [i.name for i in rec.ingredients][:8] if rec else [],
+                "steps": rec.steps[:6] if rec else [],
+            })
         return {
             "meal": session.meal, "people": session.people,
-            "dishes": [
-                {
-                    "id": d.recipe_id, "name": d.name, "role": d.role,
-                    "reason": d.reason, "kept": d.locked,
-                    "ingredients": [
-                        i.name for i in (store.get(d.recipe_id).ingredients
-                                         if store.get(d.recipe_id) else [])
-                    ][:8],
-                }
-                for d in session.current_plan
-            ],
+            "dishes": dishes,
             "nutrition_per_person": balance,
             "constraints_applied": session.constraints.summary(),
         }

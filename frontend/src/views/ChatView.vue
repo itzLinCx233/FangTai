@@ -50,6 +50,12 @@
               </div>
               <div class="meta">{{ (d.ingredients || []).slice(0, 6).join('、') }}</div>
               <div class="reason" v-if="d.reason">💡 {{ d.reason }}</div>
+              <div v-if="(d.steps || []).length" class="steps-toggle" @click="d._open = !d._open">
+                👨‍🍳 做法 {{ d._open ? '▴' : '▾' }}
+              </div>
+              <ol v-if="d._open && (d.steps || []).length" class="steps">
+                <li v-for="(s, si) in d.steps" :key="si">{{ s }}</li>
+              </ol>
             </div>
           </div>
           <div class="nutri">
@@ -457,6 +463,10 @@ main { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: 
 .dish .kept { font-size: 11px; background: #eef4ff; color: #3f6ac6; padding: 1px 8px; border-radius: 10px }
 .dish .meta { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.5 }
 .dish .reason { font-size: 12px; color: #4a5361; margin-top: 4px }
+.dish .steps-toggle { font-size: 12px; color: var(--primary); margin-top: 6px; cursor: pointer; user-select: none }
+.dish .steps-toggle:hover { text-decoration: underline }
+.dish .steps { margin: 6px 0 0; padding-left: 18px; font-size: 12px; color: #4a5361; line-height: 1.6 }
+.dish .steps li { margin-bottom: 2px }
 .nutri { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--border); display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: #4a5361 }
 .nutri b { color: var(--text) }
 .nutri .tag { background: var(--primary-light); color: var(--primary); border-radius: 8px; padding: 2px 10px }

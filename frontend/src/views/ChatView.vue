@@ -309,7 +309,8 @@ async function send() {
           items.value.push({ type: 'plan', plan: ev })
           const i = items.value.indexOf(ai)
           if (i >= 0) items.value.splice(i, 1)
-          fillEmptyReasons(ev)
+          // 必须取 items 内的响应式代理再改 reason，否则视图不刷新（占位会一直挂着）
+          fillEmptyReasons((items.value[items.value.length - 1] as any).plan)
         } else if (ev.type === 'delta') {
           if (firstTok === null) firstTok = performance.now() - t0
           if (!hasPlan) ai.text += ev.text

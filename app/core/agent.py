@@ -103,6 +103,11 @@ async def llm_select(
     task_lines = [f"任务：为{session.meal or '一餐'}（{session.people}人）选 {dish_count} 道菜"]
     if soup_needed:
         task_lines.append("其中应包含 1 道汤")
+    banned_ctx = (session.constraints.allergens + session.constraints.taboo_keys
+                  + session.constraints.extra_banned)
+    if banned_ctx:
+        task_lines.append("用户忌口/过敏（菜与理由描述都不得违背，如忌辣则理由不得写辣/酸辣）："
+                          + "、".join(banned_ctx))
     profile_lines = []
     for pid in session.profile_ids:
         p = get_profile(pid)
@@ -579,6 +584,11 @@ class MealAgent:
                 bits.append(f"餐次：{session.meal}")
             if session.constraints.taste_pref:
                 bits.append(f"用户口味偏好：{session.constraints.taste_pref}")
+            banned = (session.constraints.allergens + session.constraints.taboo_keys
+                      + session.constraints.extra_banned)
+            if banned:
+                bits.append("用户忌口（理由中不得出现相关口味，如忌辣不得写辣/酸辣）："
+                            + "、".join(banned))
         try:
             llm = get_llm()
             txt = (await llm.chat_fast(

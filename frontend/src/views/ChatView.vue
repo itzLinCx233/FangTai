@@ -525,8 +525,8 @@ main { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: 
 
 /* 菜品详情弹窗（近正方形大窗：菜名/配料/做法）；.modal.dish-modal 提高特异性压过 .modal{width:440px} */
 .modal.dish-modal { width: min(560px, 92vw); height: min(78vh, 800px); display: flex; flex-direction: column; position: relative; overflow: hidden }
-.dm-close { position: absolute; top: 8px; right: 12px; z-index: 3; font-size: 30px; width: 40px; height: 40px; line-height: 40px; border-radius: 50%; transition: background .15s }
-.dm-close:hover { background: #f0f2f5 }
+.close-x.dm-close { position: absolute; top: 8px; right: 12px; z-index: 3; font-size: 30px; width: 40px; height: 40px; line-height: 40px; border-radius: 50%; transition: background .15s }
+.close-x.dm-close:hover { background: #f0f2f5 }
 .dm-body { flex: 1; overflow-y: auto; padding: 24px 26px }
 .dm-name { font-size: 22px; font-weight: 700; color: var(--text); padding-right: 40px }
 .dm-hr { border: none; border-top: 1px solid var(--border); margin: 14px 0 }

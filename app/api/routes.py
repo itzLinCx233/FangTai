@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import time
 
 from fastapi import APIRouter, Header, HTTPException
@@ -35,12 +36,16 @@ def _optional_user(authorization: str | None) -> dict | None:
     return None
 
 
+_TABOO_SPLIT_RE = re.compile(r"[、，,；;/\s]+")
+
+
 def _apply_user_taboo(sess: dlg.DialogSession, user: dict | None):
-    """把用户资料里的忌口并入会话约束（会话内幂等）。"""
+    """把用户资料里的忌口（自由文本）并入会话约束（会话内幂等）。"""
     if not user or not user.get("taboo"):
         return
     have = set(sess.constraints.extra_banned)
-    for t in str(user["taboo"]).split("、"):
+    raw = str(user["taboo"]).replace("和", "、").replace("与", "、")
+    for t in _TABOO_SPLIT_RE.split(raw):
         t = t.strip()
         if t and t not in have:
             sess.constraints.add_banned([t])

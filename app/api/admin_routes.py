@@ -119,7 +119,7 @@ async def sessions(
 
 @router.get("/sessions/{sid}/messages")
 async def session_messages(sid: str, admin: dict = Depends(security.require_admin)):
-    row = db.query_one("SELECT session_id FROM chat_sessions WHERE session_id=%s", (sid,))
+    row = db.query_one("SELECT session_id FROM chat_sessions WHERE session_id=:sid", {"sid": sid})
     if not row:
         raise HTTPException(404, "会话不存在")
     return {"session_id": sid, "items": db.get_session_messages(sid)}

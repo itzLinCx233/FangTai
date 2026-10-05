@@ -1,14 +1,14 @@
 """Add app_settings KV table (runtime-switchable LLM config etc.).
 
-Revision ID: 0003_app_settings
-Revises: 0002_user_profile
+Revision ID: 0004_app_settings
+Revises: 0003_user_city
 """
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.mysql import MEDIUMTEXT
 
-revision = "0003_app_settings"
-down_revision = "0002_user_profile"
+revision = "0004_app_settings"
+down_revision = "0003_user_city"
 branch_labels = None
 depends_on = None
 

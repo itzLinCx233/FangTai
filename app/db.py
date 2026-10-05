@@ -51,6 +51,7 @@ class User(Base):
     taboo: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)         # 忌口（逗号分隔，空=NULL 即"无"）
     height_cm: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)         # 身高 cm（可空=保密）
     weight_kg: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)         # 体重 kg（可空=保密）
+    city: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)           # 居住地（可空=保密）
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now(),
@@ -214,6 +215,7 @@ def _user_dict(u: User) -> dict:
         "phone": u.phone, "is_active": bool(u.is_active),
         "gender": u.gender, "birthday": str(u.birthday) if u.birthday else None,
         "taboo": u.taboo, "height_cm": u.height_cm, "weight_kg": u.weight_kg,
+        "city": u.city,
         "created_at": str(u.created_at or ""), "last_login_at": str(u.last_login_at or ""),
         "password_hash": u.password_hash,
     }
@@ -264,7 +266,7 @@ def authenticate(username: str, password: str) -> Optional[dict]:
 
 def update_user(uid: int, fields: dict) -> bool:
     allow = {"nickname", "role", "health_profile_id", "phone", "is_active", "password_hash",
-             "gender", "birthday", "taboo", "height_cm", "weight_kg"}
+             "gender", "birthday", "taboo", "height_cm", "weight_kg", "city"}
     vals = {k: v for k, v in fields.items() if k in allow}
     if not vals:
         return False

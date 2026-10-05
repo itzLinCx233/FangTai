@@ -37,13 +37,11 @@ class ProfileReq(BaseModel):
     # 个人信息（首次登录引导填写）
     gender: str | None = None                        # 男/女/保密
     birthday: str | None = None                      # YYYY-MM-DD，推算年龄须 0-100
-    taboo: list[str] | None = None                   # 忌口多选，空列表=无
+    taboo: str | None = None                         # 忌口自由文本（顿号/逗号分隔），空=无
     height_cm: int | None = None                     # 0-250
     weight_kg: int | None = None                     # 0-300
+    city: str | None = None                          # 居住地自由文本，可空
 
-
-TABOO_OPTIONS = ["海鲜", "虾", "蟹", "鱼", "花生", "坚果", "牛奶", "鸡蛋",
-                 "豆制品", "芒果", "酒精", "辣", "香菜", "内脏"]
 
 def _validate_profile_fields(req: ProfileReq) -> dict:
     """校验并转换个人信息字段，返回可写入的 fields 片段。"""
@@ -67,10 +65,10 @@ def _validate_profile_fields(req: ProfileReq) -> dict:
                 raise HTTPException(400, f"由生日推算的年龄须在 0-100 之间（当前 {age}）")
             fields["birthday"] = d
     if req.taboo is not None:
-        bad = [t for t in req.taboo if t not in TABOO_OPTIONS]
-        if bad:
-            raise HTTPException(400, f"忌口包含非法项：{bad}（可选：{'、'.join(TABOO_OPTIONS)}）")
-        fields["taboo"] = "、".join(req.taboo) if req.taboo else None
+        taboo = req.taboo.strip()
+        if len(taboo) > 100:
+            raise HTTPException(400, "忌口内容过长（最多 100 字）")
+        fields["taboo"] = taboo or None
     if req.height_cm is not None:
         if not (0 < req.height_cm <= 250):
             raise HTTPException(400, "身高须在 1-250 cm 之间")
@@ -79,6 +77,11 @@ def _validate_profile_fields(req: ProfileReq) -> dict:
         if not (0 < req.weight_kg <= 300):
             raise HTTPException(400, "体重须在 1-300 kg 之间")
         fields["weight_kg"] = req.weight_kg
+    if req.city is not None:
+        city = req.city.strip()
+        if len(city) > 32:
+            raise HTTPException(400, "居住地过长（最多 32 字）")
+        fields["city"] = city or None
     return fields
 
 
@@ -114,9 +117,7 @@ async def login(req: LoginReq):
 
 @router.get("/me")
 async def me(user: dict = Depends(security.current_user)):
-    data = db.user_public(user)
-    data["taboo_options"] = TABOO_OPTIONS
-    return data
+    return db.user_public(user)
 
 
 @router.put("/profile")
@@ -153,8 +154,7 @@ async def my_sessions(user: dict = Depends(security.current_user)):
 async def my_session_messages(sid: str, user: dict = Depends(security.current_user)):
     """查看自己某次会话的聊天记录。"""
     _require_db()
-    row = db.query_one(
-        "SELECT user_id FROM chat_sessions WHERE session_id=%s", (sid,))
+    row = db.query_one("SELECT user_id FROM chat_sessions WHERE session_id=:sid", {"sid": sid})
     if not row or row["user_id"] != user["id"]:
         raise HTTPException(404, "会话不存在")
     return {"session_id": sid, "items": db.get_session_messages(sid)}

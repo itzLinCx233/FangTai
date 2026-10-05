@@ -41,31 +41,24 @@
           <div class="bubble system">{{ it.text }}</div>
         </div>
         <div v-else-if="it.type === 'plan'" class="plan-card">
-          <h4>📋 本餐方案（{{ it.plan.people || 2 }}人 · {{ it.plan.meal || '' }}）</h4>
+          <h4>📋 本餐方案 · {{ it.plan.people || 2 }}人 · 忌口：{{ (it.plan.taboos || []).join('、') || '无' }}</h4>
           <div class="dishes">
-            <div class="dish" v-for="d in it.plan.dishes" :key="d.id">
+            <div class="dish" v-for="d in sortDishes(it.plan.dishes)" :key="d.id"
+                 :class="{ link: d.detail }" @click="openDish(d)">
               <div class="name">{{ d.name }}
                 <span class="role" :class="{ soup: d.role === '汤' }">{{ d.role }}</span>
                 <span v-if="d.kept" class="kept">沿用</span>
               </div>
-              <div class="meta">{{ (d.ingredients || []).slice(0, 6).join('、') }}</div>
-              <div class="reason" v-if="d.reason">💡 {{ d.reason }}</div>
-              <div v-if="(d.steps || []).length" class="steps-toggle" @click="d._open = !d._open">
-                👨‍🍳 做法 {{ d._open ? '▴' : '▾' }}
-              </div>
-              <ol v-if="d._open && (d.steps || []).length" class="steps">
-                <li v-for="(s, si) in d.steps" :key="si">{{ s }}</li>
-              </ol>
+              <div class="reason">{{ d.reason || '推荐理由生成中…' }}</div>
             </div>
           </div>
-          <div class="nutri">
+          <div class="nutri" v-if="it.plan.nutrition_per_person">
             <span>每人约 <b>{{ it.plan.nutrition_per_person?.intake?.kcal ?? '-' }}</b> kcal</span>
             <span>蛋白质 <b>{{ it.plan.nutrition_per_person?.intake?.protein_g ?? '-' }}</b>g</span>
             <span>脂肪 <b>{{ it.plan.nutrition_per_person?.intake?.fat_g ?? '-' }}</b>g</span>
             <span>碳水 <b>{{ it.plan.nutrition_per_person?.intake?.carbs_g ?? '-' }}</b>g</span>
             <span class="tag">{{ it.plan.nutrition_per_person?.purine_level }}</span>
           </div>
-          <div class="constraints">✅ 已满足约束：{{ it.plan.constraints_applied || '' }}</div>
         </div>
       </template>
     </main>
@@ -151,6 +144,26 @@
     </div>
   </div>
 
+    <!-- 菜品详情弹窗：菜名 / 分割线 / 详细配料表 / 分割线 / 详细做法 -->
+    <div class="modal-mask" v-if="dishView" @click.self="dishView = null">
+      <div class="modal dish-modal">
+        <button class="close-x dm-close" @click="dishView = null">×</button>
+        <div class="modal-body dm-body">
+          <h3 class="dm-name">{{ dishView.name }}</h3>
+          <hr class="dm-hr">
+          <h4 class="dm-sub">详细配料表</h4>
+          <ul class="dm-ings">
+            <li v-for="(g, k) in dishView.detail?.ingredients || []" :key="k">{{ g }}</li>
+          </ul>
+          <hr class="dm-hr">
+          <h4 class="dm-sub">详细做法</h4>
+          <ol class="dm-steps">
+            <li v-for="(s, k) in dishView.detail?.steps || []" :key="k">{{ s }}</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+
     <!-- 首次登录：完善个人信息 -->
     <div class="modal-mask" v-if="obShow">
       <div class="modal">
@@ -223,6 +236,35 @@ const quicks = [
 ]
 const dots = '…'
 
+/* 菜品详情弹窗 */
+const dishView = ref<any>(null)
+function openDish(d: any) { if (d?.detail) dishView.value = d }
+
+/* 双列对称展示，汤固定排在左上角首位（仅显示顺序，不影响 plan 事件本身） */
+function sortDishes(ds: any[]) {
+  if (!Array.isArray(ds)) return ds || []
+  const isSoup = (d: any) => d.role === '汤' || /汤/.test(d.name || '')
+  return [...ds.filter(isSoup), ...ds.filter((d) => !isSoup(d))]
+}
+
+/* 选菜 LLM 偶发漏写理由：其他菜先显示，空理由菜异步重试生成 */
+async function fillEmptyReasons(plan: any) {
+  const empties = (plan.dishes || []).filter((d: any) => !d.reason)
+  if (!empties.length) return
+  await Promise.all(empties.map(async (d: any) => {
+    try {
+      const r = await api<{ reason: string }>('/api/dish_reason', {
+        method: 'POST',
+        body: JSON.stringify({ dish_id: d.id, session_id: sessionId.value }),
+      })
+      if (r.reason) d.reason = r.reason
+      else d.reason = '与本餐荤素搭配协调，营养均衡'
+    } catch {
+      d.reason = '与本餐荤素搭配协调，营养均衡'
+    }
+  }))
+}
+
 const avatarChar = computed(() => {
   const u = auth.user
   return ((u!.nickname || u!.username)[0] || '?').toUpperCase()
@@ -249,6 +291,7 @@ async function send() {
   items.value.push(ai)
   const t0 = performance.now()
   let firstTok: number | null = null
+  let hasPlan = false
   try {
     const resp = await fetch('/api/chat', {
       method: 'POST',
@@ -270,10 +313,17 @@ async function send() {
         if (!raw.startsWith('data: ')) continue
         let ev: any
         try { ev = JSON.parse(raw.slice(6)) } catch { continue }
-        if (ev.type === 'plan') items.value.push({ type: 'plan', plan: ev })
-        else if (ev.type === 'delta') {
+        if (ev.type === 'plan') {
+          // 方案卡片即本轮回复：出卡即移除文字气泡（前导句只是选菜期间的过渡显示）
+          hasPlan = true
+          items.value.push({ type: 'plan', plan: ev })
+          const i = items.value.indexOf(ai)
+          if (i >= 0) items.value.splice(i, 1)
+          // 必须取 items 内的响应式代理再改 reason，否则视图不刷新（占位会一直挂着）
+          fillEmptyReasons((items.value[items.value.length - 1] as any).plan)
+        } else if (ev.type === 'delta') {
           if (firstTok === null) firstTok = performance.now() - t0
-          ai.text += ev.text
+          if (!hasPlan) ai.text += ev.text
         } else if (ev.type === 'clarify') {
           // 澄清问题随后会以 delta 流式下发，这里不重复拼接
         } else if (ev.type === 'done') {
@@ -281,6 +331,10 @@ async function send() {
         }
         scrollBottom()
       }
+    }
+    if (hasPlan) {
+      const i = items.value.indexOf(ai)
+      if (i >= 0) items.value.splice(i, 1)
     }
     ai.done = true
   } catch (e: any) {
@@ -377,9 +431,14 @@ function profileIncomplete(): boolean {
   return !!u && (!u.gender || !u.birthday)
 }
 
+function obDismissKey() {
+  return 'ft_ob_dismissed_' + (auth.user?.username || '')
+}
+
 function maybeShowOnboard() {
   if (!profileIncomplete()) return
-  if (sessionStorage.getItem('ft_ob_dismissed')) return
+  // 跳过按账号持久化（localStorage）：刷新/重开不再反复弹；仍可从个人中心补填
+  if (localStorage.getItem(obDismissKey())) return
   ob.value = { gender: auth.user!.gender || '', birthday: auth.user!.birthday || '',
                taboo: auth.user!.taboo ? auth.user!.taboo.split('、') : [],
                height_cm: auth.user!.height_cm || null, weight_kg: auth.user!.weight_kg || null }
@@ -387,7 +446,7 @@ function maybeShowOnboard() {
 }
 
 function skipOnboard() {
-  sessionStorage.setItem('ft_ob_dismissed', '1')
+  localStorage.setItem(obDismissKey(), '1')
   obShow.value = false
 }
 
@@ -453,24 +512,32 @@ main { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: 
 .bubble.system { background: #f0f7f5; border-color: #cfe5df; color: #3c6b5d; font-size: 13px }
 .bubble.typing::after { content: '●●●'; color: var(--muted); animation: blink 1.2s infinite; letter-spacing: 2px; font-size: 10px }
 @keyframes blink { 0%, 80%, 100% { opacity: .25 } 40% { opacity: 1 } }
-.plan-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; max-width: 860px; width: 100%; margin: 0 auto }
+.plan-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; max-width: 620px; width: 100%; margin: 0 auto }
 .plan-card h4 { font-size: 13px; color: var(--primary); margin-bottom: 10px }
-.dishes { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px }
+.dishes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px }
 .dish { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: #fbfcfd }
 .dish .name { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap }
+.dish .kept { font-size: 11px; background: #eef4ff; color: #3f6ac6; padding: 1px 8px; border-radius: 10px }
 .dish .role { font-size: 11px; background: var(--primary-light); color: var(--primary); padding: 1px 8px; border-radius: 10px }
 .dish .role.soup { background: #fdf1dd; color: #a06a10 }
-.dish .kept { font-size: 11px; background: #eef4ff; color: #3f6ac6; padding: 1px 8px; border-radius: 10px }
-.dish .meta { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.5 }
-.dish .reason { font-size: 12px; color: #4a5361; margin-top: 4px }
-.dish .steps-toggle { font-size: 12px; color: var(--primary); margin-top: 6px; cursor: pointer; user-select: none }
-.dish .steps-toggle:hover { text-decoration: underline }
-.dish .steps { margin: 6px 0 0; padding-left: 18px; font-size: 12px; color: #4a5361; line-height: 1.6 }
-.dish .steps li { margin-bottom: 2px }
+.dish .reason { font-size: 12.5px; color: #4a5361; margin-top: 5px; line-height: 1.6 }
+.dish.link { cursor: pointer; transition: border-color .15s, box-shadow .15s }
+.dish.link:hover { border-color: var(--primary); box-shadow: 0 2px 10px rgba(0,0,0,.06) }
 .nutri { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--border); display: flex; gap: 18px; flex-wrap: wrap; font-size: 12.5px; color: #4a5361 }
 .nutri b { color: var(--text) }
 .nutri .tag { background: var(--primary-light); color: var(--primary); border-radius: 8px; padding: 2px 10px }
-.constraints { margin-top: 8px; font-size: 12px; color: var(--muted) }
+
+/* 菜品详情弹窗（近正方形大窗：菜名/配料/做法）；.modal.dish-modal 提高特异性压过 .modal{width:440px} */
+.modal.dish-modal { width: min(560px, 92vw); height: min(78vh, 800px); display: flex; flex-direction: column; position: relative; overflow: hidden }
+.dm-close { position: absolute; top: 10px; right: 14px; z-index: 3; font-size: 22px }
+.dm-body { flex: 1; overflow-y: auto; padding: 24px 26px }
+.dm-name { font-size: 18px; font-weight: 700; color: var(--text); padding-right: 26px }
+.dm-hr { border: none; border-top: 1px solid var(--border); margin: 14px 0 }
+.dm-sub { font-size: 14px; color: var(--primary); margin-bottom: 8px }
+.dm-ings { list-style: none; display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px 18px; margin: 0; padding: 0 }
+.dm-ings li { font-size: 13px; color: #4a5361; line-height: 1.7 }
+.dm-steps { margin: 0; padding-left: 20px }
+.dm-steps li { font-size: 13px; color: #4a5361; line-height: 1.8; margin-bottom: 6px }
 footer { background: var(--card); border-top: 1px solid var(--border); padding: 14px 24px }
 .quick { display: flex; gap: 8px; max-width: 860px; margin: 0 auto 8px; flex-wrap: wrap }
 .quick button { font-size: 12px; padding: 5px 12px; border: 1px solid var(--border); background: #fff; border-radius: 14px; cursor: pointer; color: #4a5361 }

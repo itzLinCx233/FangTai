@@ -13,7 +13,7 @@ from app.core.recipe_store import (
 )
 from app.core.constraint_engine import ProfileConstraints, merge_constraints
 from app.core.nutrition import recipe_nutrition, balance_report
-from app.core.profiles import load_profiles
+from app.core.profiles import load_profiles, get_profile
 from app.core.planner import build_combo, default_dish_count
 from app.core import dialog as dlg
 from app.core.agent import filter_by_meal, meal_conflict_ok, MEAL_CONFLICTS
@@ -145,18 +145,16 @@ def test_meal_conflict_filter():
 
 
 def test_conflict_and_taste():
-    # 矛盾检测：消息内自相矛盾
+    # 同轮自相矛盾（"想吃辣但别放辣"）→ 主动澄清
     slots = dlg.rule_slots("想吃辣的但是别放辣")
     assert slots.taste_add and slots.banned_add
+    assert dlg.detect_conflicts(slots)
+    # 跨轮口味变化不算矛盾（apply_slots 按"本轮需求优先"解除旧忌口）
     c = dlg.ProfileConstraints()
-    assert dlg.detect_conflicts(slots, c)
-    # 跨轮矛盾：此前忌辣，本轮想吃辣
     c.add_banned(["辣"])
-    slots2 = dlg.TurnSlots(taste_add=["辣"])
-    assert "辣" in dlg.detect_conflicts(slots2, c)
+    assert dlg.detect_conflicts(dlg.TurnSlots(taste_add=["辣"])) == ""
     # 正向口味切换不算矛盾
-    slots3 = dlg.TurnSlots(taste_add=["清淡"])
-    assert not dlg.detect_conflicts(slots3, c)
+    assert not dlg.detect_conflicts(dlg.TurnSlots(taste_add=["清淡"]))
     # 口味多值并存：先辣后清淡，两个都保留
     sess = dlg.DialogSession()
     sess.apply_slots(dlg.TurnSlots(taste_add=["辣"]))
@@ -172,6 +170,66 @@ def test_conflict_and_taste():
     print("test_conflict_and_taste ✓")
 
 
+def test_dialog_constraint_priority():
+    store = get_store()
+    # 会话忌口被后续轮次正向口味解除（最新对话优先于旧约束）
+    s = dlg.DialogSession()
+    s.apply_slots(dlg.rule_slots("安排晚饭，别做辣的"))
+    assert "辣" in s.constraints.extra_banned
+    s.apply_slots(dlg.rule_slots("还是来点辣的吧"))
+    assert "辣" not in s.constraints.extra_banned
+    assert s.constraints.taste_pref == "辣"
+    # 档案过敏不因对话"想吃"解除（赛题零违反口径）
+    s2 = dlg.DialogSession()
+    s2.set_profiles([1], get_profile)  # user1 海鲜过敏
+    s2.apply_slots(dlg.rule_slots("今天就馋鱼，安排一条"))
+    assert not s2.constraints.ok(store.find_by_name("家常鲈鱼")[0])
+    # remove_banned 只解除会话忌口，疾病忌口保留
+    c = ProfileConstraints.from_profile(load_profiles()[5])  # user5 高尿酸+高血压
+    c.add_banned(["辣"])
+    c.remove_banned("辣")
+    assert c.extra_banned == []
+    assert "高尿酸" in c.taboo_keys
+    print("test_dialog_constraint_priority ✓")
+
+
+def test_equipment_and_dedup():
+    store = get_store()
+    # 设备限制抽取："没有烤箱/空气炸锅" → 禁用对应烹饪方式
+    s1 = dlg.rule_slots("安排两人晚餐，家里没有烤箱，也没有空气炸锅")
+    assert "烤" in s1.banned_methods and "炸" in s1.banned_methods
+    s2 = dlg.rule_slots("别用烤的方式做")
+    assert "烤" in s2.banned_methods
+    s3 = dlg.rule_slots("用烤箱烤个鸡翅吃")   # 正向提及设备不禁用
+    assert "烤" not in s3.banned_methods
+    # 方式违例判定：烤菜命中；非烤不命中；步骤含烤箱的非烤菜命中
+    baked = next(r for r in store.recipes if r.category["cook_method"] == "烤")
+    assert dlg.method_violations(baked, ["烤", "炸"]) == ["烤"]
+    steamed = next(r for r in store.recipes if r.category["cook_method"] == "蒸")
+    assert not dlg.method_violations(steamed, ["烤", "炸"])
+    oven_step = next(r for r in store.recipes
+                     if r.category["cook_method"] != "烤"
+                     and any("烤箱" in st for st in r.steps[:4]))
+    assert dlg.method_violations(oven_step, ["烤"]) == ["烤"]
+    # 会话累积 + 方案设备校验（violating_dishes 应含烤菜）
+    sess = dlg.DialogSession()
+    sess.apply_slots(s1)
+    assert sess.banned_methods == ["烤", "炸"]
+    sess.current_plan = [
+        dlg.DishPlanItem(recipe_id=baked.id, name=baked.name),
+        dlg.DishPlanItem(recipe_id=steamed.id, name=steamed.name),
+    ]
+    violating = sess.violating_dishes()
+    assert [d.recipe_id for d in violating] == [baked.id]
+    # 跨轮去重：record_served 累积历轮菜品，重复推荐可检出
+    sess.record_served()
+    assert sess.served_ids == {baked.id, steamed.id}
+    sess.current_plan = [dlg.DishPlanItem(recipe_id=baked.id, name=baked.name)]
+    sess.record_served()
+    assert sess.served_ids == {baked.id, steamed.id}
+    print("test_equipment_and_dedup ✓")
+
+
 if __name__ == "__main__":
     test_recipe_store()
     test_constraint_engine()
@@ -181,4 +239,6 @@ if __name__ == "__main__":
     test_estimate_minutes()
     test_meal_conflict_filter()
     test_conflict_and_taste()
+    test_dialog_constraint_priority()
+    test_equipment_and_dedup()
     print("\n全部通过 ✓")

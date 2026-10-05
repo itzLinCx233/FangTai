@@ -216,6 +216,16 @@ class ProfileConstraints:
                 self.extra_banned.append(k)
         self._banned_re = None
 
+    def remove_banned(self, keyword: str):
+        """解除会话追加忌口（仅 extra_banned）。
+
+        过敏原/疾病忌口来自档案，属于健康安全约束，不因对话"想吃"而解除
+        （赛题零违反按档案口径判定）。口味类会话忌口以最新对话为准。
+        """
+        if keyword in self.extra_banned:
+            self.extra_banned.remove(keyword)
+            self._banned_re = None
+
     # ---------- 违禁词表 ----------
     def allergen_keywords(self) -> list[tuple[str, str]]:
         """[(过敏原, 别名), ...]"""

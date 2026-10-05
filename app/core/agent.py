@@ -47,9 +47,21 @@ def meal_conflict_ok(rec: Recipe, meal: str | None) -> bool:
 
 def candidate_pool(session: dlg.DialogSession, query: str, need: int = 24,
                    use_label_filter: bool = True) -> list[Recipe]:
-    """约束过滤 + 混合检索 → 候选菜谱池（口味为软加权，餐次为硬过滤可放宽）。"""
+    """约束过滤 + 混合检索 → 候选菜谱池（口味为软加权，餐次为硬过滤可放宽）。
+
+    设备限制（无烤箱/炸锅）与跨轮去重（历轮已推荐过的菜不再入选，
+    reject_all 换桌同样不吃回头菜）在 ok_ids 阶段排除；历史菜品排除后
+    候选枯竭时放宽（约束安全性优先于去重体验）。
+    """
     store = get_store()
     ok_ids = store.filter_ids(session.constraints.banned_pattern)
+    if session.banned_methods:
+        ok_ids = {rid for rid in ok_ids
+                  if not dlg.method_violations(store.by_id[rid], session.banned_methods)}
+    if session.served_ids:
+        fresh = ok_ids - session.served_ids
+        if len(fresh) >= max(8, need):
+            ok_ids = fresh
     label_filter = session.label_filter() if use_label_filter else {}
     if label_filter:
         # 标签过滤后候选不足时逐级放宽（先放宽餐次；冲突餐次在检索后仍会硬排除）
@@ -90,14 +102,17 @@ def filter_by_meal(pool: list[Recipe], meal: str | None, need: int) -> list[Reci
 
 # ---------------------------------------------------------------- 选菜（零幻觉）
 SELECT_SYS = """你是膳食选菜引擎。只允许从候选列表中选菜，绝不使用列表外的菜。
-输出严格 JSON：{"dishes":[{"id":候选id,"role":"主菜|荤菜|素菜|蛋类|豆制品|汤|主食|小菜","reason":"≤14字理由，点出与用户口味/健康需求/忌口的关联"}]}
-要求：
+输出严格 JSON：{"dishes":[{"id":候选id,"role":"主菜|荤菜|素菜|蛋类|豆制品|汤|主食|小菜","reason":"20字左右的推荐理由，点出与用户口味/健康需求/忌口的关联"}]}要求：
 1. 严格满足每个人的忌口/过敏（候选已过滤，仍需复核）
 2. 荤素搭配合理，优先照顾用户健康需求与口味；理由需说清该菜照顾了谁（如"低脂适合减脂""软烂适合老人"）
 3. 菜数等于要求数量，不许多选
-4. 除用户明确要求多汤外，全桌至多 1 道汤，其余选炒/蒸/烤/拌等菜品
-5. 兼顾整桌营养均衡：避免多道高热量菜（油炸/五花肉/芝士类）叠加，素菜不过半也不可或缺
+4. 每道菜都必须写 reason 字段：20字左右的推荐理由，任何一道不得留空、不得省略
+5. 除用户明确要求多汤外，全桌至多 1 道汤，其余选炒/蒸/烤/拌等菜品
+6. 兼顾整桌营养均衡：避免多道高热量菜（油炸/五花肉/芝士类）叠加，素菜不过半也不可或缺
 只输出 JSON。"""
+
+REASON_SYS = """你是膳食推荐理由生成器。根据菜品信息与用户需求，写一句20字左右的中文推荐理由，说明为什么推荐这道菜。
+只输出理由本身：不要以菜名开头，不要引号，不要句号结尾。"""
 
 
 async def llm_select(
@@ -133,6 +148,11 @@ async def llm_select(
     if avoid_names:
         mode_txt = "已从候选剔除，不得推荐" if avoid_hard else "排在候选末尾，除非用户本轮点名否则勿选"
         task_lines.append(f"重复度控制：{avoid_names} 此前已推荐过（{mode_txt}）")
+    banned_ctx = (session.constraints.allergens + session.constraints.taboo_keys
+                  + session.constraints.extra_banned)
+    if banned_ctx:
+        task_lines.append("用户忌口/过敏（菜与理由描述都不得违背，如忌辣则理由不得写辣/酸辣）："
+                          + "、".join(banned_ctx))
     profile_lines = []
     for pid in session.profile_ids:
         p = get_profile(pid)
@@ -151,7 +171,8 @@ async def llm_select(
         for d in data.get("dishes", []):
             rid = int(d.get("id", -1))
             if rid in pool_by_id and rid not in seen and session.constraints.ok(pool_by_id[rid]):
-                picked.append((pool_by_id[rid], str(d.get("reason", ""))))
+                # 理由可能为空（LLM 偶发漏写）：透传空，前端先出卡再调 /api/dish_reason 重试生成
+                picked.append((pool_by_id[rid], str(d.get("reason", "")).strip()))
                 seen.add(rid)
         if picked:
             return picked[: dish_count + 2]
@@ -162,7 +183,7 @@ async def llm_select(
         pool, people=session.people, dish_count=dish_count,
         soup_needed=soup_needed, meal=session.meal,
     )
-    return [(d, "组合搭配优选") for d in combo.dishes[: dish_count + 2]]
+    return [(d, "荤素冷热搭配均衡，覆盖本餐营养需求") for d in combo.dishes[: dish_count + 2]]
 
 
 def finalize_plan(
@@ -277,7 +298,10 @@ class MealAgent:
                 session.constraints.allergens or session.constraints.taboo_keys
                 or session.constraints.health_needs or session.constraints.taste_pref)
         ) or bool(session.constraints.extra_banned)  # 用户资料忌口/会话忌口同样构成约束方向
-        conflict_txt = slots.conflict or dlg.detect_conflicts(slots, session.constraints)
+        # 矛盾澄清仅拦单人自相矛盾；多人同桌的口味分歧（"小孩要辣老人忌辣"）
+        # 不算矛盾，交由口味多值 + LLM 整桌分配权衡
+        conflict_txt = (slots.conflict or dlg.detect_conflicts(slots)) \
+            if len(session.profile_ids) <= 1 else ""
         if conflict_txt:
             session.add_history("user", message)
             q = (f"您提的需求里有点矛盾：{conflict_txt}。"
@@ -305,15 +329,23 @@ class MealAgent:
             yield self._done(t0, first_ts, store)
             return
 
+        # 3.05) 换桌短语规则路由：意图分类器对"换一桌/全部换掉"易误判为 add_constraint，
+        #       走"零违规不变"分支导致跨轮去重失效 → 强制 reject_all 全新选菜
+        if session.current_plan and re.search(
+                r"换一(整)?桌|全部换掉|整桌换|重新来一(桌|份)|重换一", message):
+            slots.intent = "reject_all"
+
         # 3.1) 加菜意图：在现有方案上追加（"再来点辣菜/加一道汤"），
         #      已有菜品全部锁定保留，只选新增的 1-2 道
         if (session.current_plan
                 and re.search(r"再来[一2两1]?[点道个份]|再添|再加[一1两2]?[道个份]|"
                               r"加[一1两2]?[道个份](?!油|盐|糖|水)|添[一1两2]?[道个份]|多[加来][一1两2]?[道个份]", message)):
             slots.intent = "add_dish"
+            # 加菜轮同时提了新约束（如"家里没烤箱"）→ 不合规旧菜同样替换
+            replace_targets = session.violating_dishes()
             for d in session.current_plan:
-                d.locked = True
-            kept_ids = {d.recipe_id for d in session.current_plan}
+                d.locked = d.recipe_id not in {x.recipe_id for x in replace_targets}
+            kept_ids = {d.recipe_id for d in session.current_plan if d.locked}
 
         # 3.2) 重复度治理：全新推荐轮回避上一轮菜品（须在 reject_all 清空方案前取）
         avoid_ids: set[int] = set()
@@ -326,8 +358,25 @@ class MealAgent:
                          if d.name[:2] not in message}
 
         if slots.intent in ("add_constraint", "replace_dish") and session.current_plan:
-            # 最小化修改：只替换违规/被点名菜品，其余锁定
+            # 最小化修改：只替换违规/被点名/与本轮新需求冲突的菜品，其余锁定
             replace_targets = session.violating_dishes()
+            # 需求冲突时本轮优先：本轮明确提出新口味/新餐次，与现有菜品标签不符的替换
+            new_tastes = {dlg.TASTE_PREF_MAP.get(t, t) for t in (slots.taste_add or []) if t}
+            for d in session.current_plan:
+                if d in replace_targets:
+                    continue
+                rec = store.get(d.recipe_id)
+                if rec is None:
+                    continue
+                if new_tastes:
+                    dish_tastes = set(rec.tags.get("口味", []))
+                    if dish_tastes and not (dish_tastes & new_tastes):
+                        replace_targets.append(d)
+                        continue
+                if slots.meal:
+                    dish_meals = rec.tags.get("餐次", [])
+                    if dish_meals and slots.meal not in dish_meals:
+                        replace_targets.append(d)
             if slots.intent == "replace_dish":
                 for d in session.current_plan:
                     if d.name[:2] in message or any(
@@ -354,6 +403,13 @@ class MealAgent:
                 need_count = min(session.dish_count - len(session.current_plan), need_count) or 1
 
         # 3.5) 约束追加但当前方案零违规：方案保持不变，直接确认（最小化修改）
+        # 菜数/人数缩减：先按最新要求裁剪现有方案（已确认菜品优先保留），再走确认流程
+        want_now = session.dish_count or planner.default_dish_count(
+            session.people, meal=session.meal)
+        oversized = len(session.current_plan) > want_now
+        if oversized and session.current_plan:
+            session.current_plan.sort(key=lambda d: not d.locked)
+            session.current_plan = session.current_plan[:want_now]
         if slots.intent == "add_constraint" and session.current_plan and not replace_targets:
             for d in session.current_plan:
                 d.locked = True
@@ -361,12 +417,14 @@ class MealAgent:
             nutri, balance = plan_nutrition(session)
             plan_payload = self._plan_payload(session, balance)
             yield emit({"type": "plan", **plan_payload})
-            preamble = self._preamble(session, slots, no_change=True)
+            preamble = self._preamble(session, slots, no_change=not oversized)
             for tok in [preamble[i:i + 8] for i in range(0, len(preamble), 8)]:
                 yield emit({"type": "delta", "text": tok})
                 await asyncio.sleep(0.005)
+            hint = ("（提示：已按您的要求精简为 %d 道菜，保留原方案中您已确认的菜品）" % len(session.current_plan)
+                    if oversized else "（提示：当前方案经校验已全部满足该新约束，无需调整）")
             expl = self._explanation_prompt(
-                session, message + "（提示：当前方案经校验已全部满足该新约束，无需调整）",
+                session, message + hint,
                 balance, {d.recipe_id for d in session.current_plan}, [])
             got_text = False
             try:
@@ -381,10 +439,18 @@ class MealAgent:
             yield self._done(t0, first_ts, store, plan=plan_payload)
             return
 
-        # 4) 选菜池：约束变更/加菜轮用合并查询重检索，否则用并行粗检索
-        query = message if slots.intent not in ("add_constraint", "add_dish") else (
-            (session.history[-2]["content"] if len(session.history) >= 2 else message) + " " + message
-        )
+        # 前导确认句提前到选菜前发射：内容只依赖槽位/约束/替换目标，
+        # 使首个 delta（TTFT 计时点）在意图抽取后即到达；选菜与说明在流中推进
+        preamble = self._preamble(session, slots, replaced=replace_targets)
+        for tok in [preamble[i:i + 8] for i in range(0, len(preamble), 8)]:
+            yield emit({"type": "delta", "text": tok})
+            await asyncio.sleep(0.005)
+
+        # 4) 选菜池检索查询：只取本轮增量（用户消息本身）。
+        #    既有上下文全部经结构化通道生效（ok_ids 约束白名单 / label_filter 餐次 /
+        #    keyword_boost 口味与健康需求），不拼接上轮原文——避免历史措辞
+        #    （如已被推翻的"来点辣的"）与本轮新需求同时进入检索污染召回。
+        query = message
         session.add_history("user", message)
         if slots.intent in ("add_constraint", "replace_dish", "add_dish") and session.current_plan:
             pool = await asyncio.to_thread(
@@ -392,6 +458,10 @@ class MealAgent:
         else:
             pool = await pool_task
             pool = filter_by_meal(pool, session.meal, need_count + 8)
+        # 粗检索与槽位抽取并行，本轮新提的设备限制未进检索过滤 → 池口统一补滤
+        if session.banned_methods:
+            pool = [r for r in pool
+                    if not dlg.method_violations(r, session.banned_methods)] or pool
         if replace_targets:
             soup_needed = None  # 替换模式不强制汤
         elif slots.intent == "add_dish":
@@ -423,28 +493,31 @@ class MealAgent:
                 kept_items.append(dlg.DishPlanItem(
                     recipe_id=r.id, name=r.name,
                     role="荤菜" if r.category["meat_type"] == "荤" else "素菜",
-                    reason="补位搭配",
+                    reason="补齐荤素与口味搭配，均衡本餐营养",
                 ))
                 existing.add(r.id)
+            # 本轮菜数要求少于现有方案 → 按最新需求裁剪（已确认菜品优先保留）
+            if session.dish_count and len(kept_items) > session.dish_count:
+                kept_items.sort(key=lambda d: not d.locked)
+                kept_items = kept_items[: session.dish_count]
             session.current_plan = kept_items
         else:
             session.current_plan = new_items
+        # 跨轮去重：本轮方案入账，后续（含 reject_all 换桌）不再重复推荐
+        session.record_served()
 
         # 6) 营养 + 结构化方案事件（评测/UI 消费）
         nutri, balance = plan_nutrition(session)
         plan_payload = self._plan_payload(session, balance)
         yield emit({"type": "plan", **plan_payload})
 
-        # 7) 流式生成说明（先输出前导确认句，选菜完成即刻有产出）
-        preamble = self._preamble(session, slots, replaced=replace_targets)
-        for tok in [preamble[i:i + 8] for i in range(0, len(preamble), 8)]:
-            yield emit({"type": "delta", "text": tok})
-            await asyncio.sleep(0.005)
+        # 7) 流式生成说明（前导句已在选菜前输出；说明仅服务文本流/评测协议，
+        #    UI 已卡片化，限 150 字压尾部延迟）
         expl = self._explanation_prompt(session, message, balance, kept_ids, replace_targets)
         got_text = False
         reply_parts: list[str] = []
         try:
-            async for tok in self.llm.chat_stream(expl):
+            async for tok in self.llm.chat_stream(expl, max_tokens=400):
                 got_text = True
                 reply_parts.append(tok)
                 yield emit({"type": "delta", "text": tok})
@@ -500,7 +573,7 @@ class MealAgent:
             "2. 每道菜一句话理由：结合用餐人档案（健康需求/忌口/口味/人数/餐次）说明为什么选它，"
             "并带一句做法概要（参考给定做法概要，烹饪方式+关键步骤，不得编造步骤）",
             "3. 营养数据必须引用给定数值，不要自己计算",
-            "4. 300字以内，分节可用小标题或 emoji，语气亲切专业，结尾给一句贴心提示",
+            "4. 150字以内，语气亲切专业，结尾给一句贴心提示",
         ]
         if kept_items:
             rules.append("5. 标注「沿用上轮」的菜品是应最小化修改原则保留的，需说明保留原因；未标注的为本轮新选")
@@ -544,14 +617,70 @@ class MealAgent:
                 "id": d.recipe_id, "name": d.name, "role": d.role,
                 "reason": d.reason, "kept": d.locked,
                 "ingredients": [i.name for i in rec.ingredients][:8] if rec else [],
-                "steps": rec.steps[:6] if rec else [],
+                # 前端点击菜名弹窗：全量配料含用量 + 完整做法步骤
+                "detail": self._dish_detail(rec),
             })
         return {
             "meal": session.meal, "people": session.people,
             "dishes": dishes,
             "nutrition_per_person": balance,
             "constraints_applied": session.constraints.summary(),
+            # 标题栏"忌口"展示用：过敏+疾病忌口+会话忌口合并
+            "taboos": sorted(set(session.constraints.allergens)
+                             | set(session.constraints.taboo_keys)
+                             | set(session.constraints.extra_banned)),
         }
+
+    @staticmethod
+    def _dish_detail(rec) -> dict | None:
+        """菜品详情（前端点击菜名弹窗用）：全量配料含用量 + 完整做法步骤。"""
+        if rec is None:
+            return None
+        ings = []
+        for i in rec.ingredients:
+            if i.count:
+                c = int(i.count) if float(i.count).is_integer() else i.count
+                qty = f"{c}{i.unit or ''}"
+            elif i.grams:
+                g = int(i.grams) if float(i.grams).is_integer() else round(i.grams, 1)
+                qty = f"{g}g"
+            else:
+                qty = "适量"
+            ings.append(f"{i.name} {qty}")
+        return {"ingredients": ings, "steps": list(rec.steps)}
+
+    async def dish_reason(self, recipe_id: int,
+                          session: dlg.DialogSession | None = None) -> str:
+        """为单道菜生成 20 字左右推荐理由（选菜 LLM 偶发漏写时由前端补调）。"""
+        store = get_store()
+        rec = store.get(recipe_id)
+        if rec is None:
+            raise ValueError(f"菜品不存在：{recipe_id}")
+        bits = [f"菜品：{rec.name}",
+                f"食材：{'、'.join(i.name for i in rec.ingredients[:8])}"]
+        tags = [t for v in rec.tags.values() for t in v][:8]
+        if tags:
+            bits.append(f"特点：{'、'.join(tags)}")
+        if session is not None:
+            if session.meal:
+                bits.append(f"餐次：{session.meal}")
+            if session.constraints.taste_pref:
+                bits.append(f"用户口味偏好：{session.constraints.taste_pref}")
+            banned = (session.constraints.allergens + session.constraints.taboo_keys
+                      + session.constraints.extra_banned)
+            if banned:
+                bits.append("用户忌口（理由中不得出现相关口味，如忌辣不得写辣/酸辣）："
+                            + "、".join(banned))
+        try:
+            llm = get_llm()
+            txt = (await llm.chat_fast(
+                [llm.system(REASON_SYS), llm.user("\n".join(bits))])).strip()
+            txt = txt.strip('"“”‘’').rstrip("。。.!！").strip()
+            if txt:
+                return txt[:40]
+        except Exception as e:
+            print(f"[agent] 菜品理由生成异常({rec.name}): {e}")
+        return f"{rec.name}与本餐荤素搭配协调，营养均衡"
 
     def _preamble(self, session: dlg.DialogSession, slots: dlg.TurnSlots,
                   replaced=None, no_change: bool = False) -> str:

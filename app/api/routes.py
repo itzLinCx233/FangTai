@@ -207,6 +207,22 @@ async def session_state(sid: str):
     }
 
 
+class DishReasonRequest(BaseModel):
+    """选菜 LLM 偶发漏写理由时，前端对空理由菜品逐个补调。"""
+    dish_id: int
+    session_id: str | None = None
+
+
+@router.post("/dish_reason")
+async def dish_reason(req: DishReasonRequest):
+    sess = _sessions.get(req.session_id) if req.session_id else None
+    try:
+        reason = await get_agent().dish_reason(req.dish_id, sess)
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+    return {"dish_id": req.dish_id, "reason": reason}
+
+
 @router.get("/health")
 async def health():
     from app.core.retriever import get_retriever

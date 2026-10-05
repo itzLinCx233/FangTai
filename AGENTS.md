@@ -26,7 +26,7 @@ python -m pytest tests/ -v                        # 单元测试（也可直接 
 python scripts/eval.py --mode func --out eval_func.json   # 功能评测（跳过简单场景+冲突场景901-904）
 python scripts/eval.py --mode perf --out eval_perf.json   # 性能评测（全量29轮计时，thinking=disabled）
 python scripts/score_test.py --api http://127.0.0.1:8000  # 赛题评分表自测（100 分制）
-bash scripts/test_deepseek.sh                     # DeepSeek(deepseek-flash) 全量评测，数据取自 资料/
+bash scripts/test_deepseek.sh                     # DeepSeek 全量评测（默认关思考），数据取自 资料/
 python scripts/dev_run.py                         # 进程内调试单条对话（不走 HTTP）
 python scripts/build_index.py                     # 离线重建向量索引（调云端 API 约 200 次）
 

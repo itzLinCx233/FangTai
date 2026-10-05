@@ -23,8 +23,9 @@ export LLM_API_KEY DASHSCOPE_API_KEY
 export LLM_BASE_URL="${LLM_BASE_URL:-https://api.deepseek.com}"
 export LLM_MODEL="${LLM_MODEL:-deepseek-flash}"          # DeepSeek-V4.1-Flash
 export LLM_FAST_MODEL="${LLM_FAST_MODEL:-$LLM_MODEL}"
-# flash 为思考模型：thinking 参数探测后自动落到 reasoning_effort（low 快 / high 质量优先）
-export LLM_THINKING="${LLM_THINKING:-high}"
+# 测试默认关闭思考：func 校验逻辑不依赖深思，且单轮 3s 内跑得快；
+# 需要质量优先复测时显式覆盖：LLM_THINKING=high bash scripts/test_deepseek.sh ...
+export LLM_THINKING="${LLM_THINKING:-disabled}"
 
 # ---------------- RAG：阿里云百炼（Key 缺失时检索直接报错） ----------------
 export DASHSCOPE_API_KEY="$DASHSCOPE_API_KEY"

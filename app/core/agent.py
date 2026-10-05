@@ -80,14 +80,17 @@ def filter_by_meal(pool: list[Recipe], meal: str | None, need: int) -> list[Reci
 
 # ---------------------------------------------------------------- 选菜（零幻觉）
 SELECT_SYS = """你是膳食选菜引擎。只允许从候选列表中选菜，绝不使用列表外的菜。
-输出严格 JSON：{"dishes":[{"id":候选id,"role":"主菜|荤菜|素菜|蛋类|豆制品|汤|主食|小菜","reason":"≤12字理由"}]}
-要求：
+输出严格 JSON：{"dishes":[{"id":候选id,"role":"主菜|荤菜|素菜|蛋类|豆制品|汤|主食|小菜","reason":"20字左右的推荐理由（结合健康需求/口味/搭配）"}]}要求：
 1. 严格满足每个人的忌口/过敏（候选已过滤，仍需复核）
 2. 荤素搭配合理，优先照顾用户健康需求与口味
 3. 菜数等于要求数量，不许多选
-4. 除用户明确要求多汤外，全桌至多 1 道汤，其余选炒/蒸/烤/拌等菜品
-5. 兼顾整桌营养均衡：避免多道高热量菜（油炸/五花肉/芝士类）叠加，素菜不过半也不可或缺
+4. 每道菜都必须写 reason 字段：20字左右的推荐理由，任何一道不得留空、不得省略
+5. 除用户明确要求多汤外，全桌至多 1 道汤，其余选炒/蒸/烤/拌等菜品
+6. 兼顾整桌营养均衡：避免多道高热量菜（油炸/五花肉/芝士类）叠加，素菜不过半也不可或缺
 只输出 JSON。"""
+
+REASON_SYS = """你是膳食推荐理由生成器。根据菜品信息与用户需求，写一句20字左右的中文推荐理由，说明为什么推荐这道菜。
+只输出理由本身：不要以菜名开头，不要引号，不要句号结尾。"""
 
 
 async def llm_select(
@@ -118,7 +121,8 @@ async def llm_select(
         for d in data.get("dishes", []):
             rid = int(d.get("id", -1))
             if rid in pool_by_id and rid not in seen and session.constraints.ok(pool_by_id[rid]):
-                picked.append((pool_by_id[rid], str(d.get("reason", ""))))
+                # 理由可能为空（LLM 偶发漏写）：透传空，前端先出卡再调 /api/dish_reason 重试生成
+                picked.append((pool_by_id[rid], str(d.get("reason", "")).strip()))
                 seen.add(rid)
         if picked:
             return picked[: dish_count + 2]
@@ -129,7 +133,7 @@ async def llm_select(
         pool, people=session.people, dish_count=dish_count,
         soup_needed=soup_needed, meal=session.meal,
     )
-    return [(d, "组合搭配优选") for d in combo.dishes[: dish_count + 2]]
+    return [(d, "荤素冷热搭配均衡，覆盖本餐营养需求") for d in combo.dishes[: dish_count + 2]]
 
 
 def finalize_plan(
@@ -267,6 +271,12 @@ class MealAgent:
                 yield emit({"type": "delta", "text": tok})
             yield self._done(t0, first_ts, store)
             return
+
+        # 3.05) 换桌短语规则路由：意图分类器对"换一桌/全部换掉"易误判为 add_constraint，
+        #       走"零违规不变"分支导致跨轮去重失效 → 强制 reject_all 全新选菜
+        if session.current_plan and re.search(
+                r"换一(整)?桌|全部换掉|整桌换|重新来一(桌|份)|重换一", message):
+            slots.intent = "reject_all"
 
         # 3.1) 加菜意图：在现有方案上追加（"再来点辣菜/加一道汤"），
         #      已有菜品全部锁定保留，只选新增的 1-2 道
@@ -415,7 +425,7 @@ class MealAgent:
                 kept_items.append(dlg.DishPlanItem(
                     recipe_id=r.id, name=r.name,
                     role="荤菜" if r.category["meat_type"] == "荤" else "素菜",
-                    reason="补位搭配",
+                    reason="补齐荤素与口味搭配，均衡本餐营养",
                 ))
                 existing.add(r.id)
             # 本轮菜数要求少于现有方案 → 按最新需求裁剪（已确认菜品优先保留）
@@ -522,12 +532,59 @@ class MealAgent:
                         i.name for i in (store.get(d.recipe_id).ingredients
                                          if store.get(d.recipe_id) else [])
                     ][:8],
+                    "detail": self._dish_detail(store.get(d.recipe_id)),
                 }
                 for d in session.current_plan
             ],
             "nutrition_per_person": balance,
             "constraints_applied": session.constraints.summary(),
         }
+
+    @staticmethod
+    def _dish_detail(rec) -> dict | None:
+        """菜品详情（前端点击菜名弹窗用）：全量配料含用量 + 完整做法步骤。"""
+        if rec is None:
+            return None
+        ings = []
+        for i in rec.ingredients:
+            if i.count:
+                c = int(i.count) if float(i.count).is_integer() else i.count
+                qty = f"{c}{i.unit or ''}"
+            elif i.grams:
+                g = int(i.grams) if float(i.grams).is_integer() else round(i.grams, 1)
+                qty = f"{g}g"
+            else:
+                qty = "适量"
+            ings.append(f"{i.name} {qty}")
+        return {"ingredients": ings, "steps": list(rec.steps)}
+
+    async def dish_reason(self, recipe_id: int,
+                          session: dlg.DialogSession | None = None) -> str:
+        """为单道菜生成 20 字左右推荐理由（选菜 LLM 偶发漏写时由前端补调）。"""
+        store = get_store()
+        rec = store.get(recipe_id)
+        if rec is None:
+            raise ValueError(f"菜品不存在：{recipe_id}")
+        bits = [f"菜品：{rec.name}",
+                f"食材：{'、'.join(i.name for i in rec.ingredients[:8])}"]
+        tags = [t for v in rec.tags.values() for t in v][:8]
+        if tags:
+            bits.append(f"特点：{'、'.join(tags)}")
+        if session is not None:
+            if session.meal:
+                bits.append(f"餐次：{session.meal}")
+            if session.constraints.taste_pref:
+                bits.append(f"用户口味偏好：{session.constraints.taste_pref}")
+        try:
+            llm = get_llm()
+            txt = (await llm.chat_fast(
+                [llm.system(REASON_SYS), llm.user("\n".join(bits))])).strip()
+            txt = txt.strip('"“”‘’').rstrip("。。.!！").strip()
+            if txt:
+                return txt[:40]
+        except Exception as e:
+            print(f"[agent] 菜品理由生成异常({rec.name}): {e}")
+        return f"{rec.name}与本餐荤素搭配协调，营养均衡"
 
     def _preamble(self, session: dlg.DialogSession, slots: dlg.TurnSlots,
                   replaced=None, no_change: bool = False) -> str:

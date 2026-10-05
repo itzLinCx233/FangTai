@@ -242,6 +242,29 @@ class MealAgent:
             candidate_pool, session, message, 40, False)
         slots = await slots_task
         session.apply_slots(slots)
+
+        # 3.05) 换桌短语规则路由：意图分类器对"换一桌/全部换掉"易误判为 add_constraint，
+        #       走"零违规不变"分支导致跨轮去重失效 → 强制 reject_all 全新选菜
+        if session.current_plan and re.search(
+                r"换一(整)?桌|全部换掉|整桌换|重新来一(桌|份)|重换一", message):
+            slots.intent = "reject_all"
+
+        # 3.1) 加菜意图：在现有方案上追加（"再来点辣菜/加一道汤/想喝汤"），
+        #      已有菜品全部锁定保留，只选新增的 1-2 道
+        if (session.current_plan
+                and re.search(r"再来[一2两1]?[点道个份]|再添|再加[一1两2]?[道个份]|"
+                              r"加[一1两2]?[道个份](?!油|盐|糖|水)|添[一1两2]?[道个份]|多[加来][一1两2]?[道个份]|"
+                              r"(想|要)喝[点一]?汤|来[一1]?[碗份]汤", message)):
+            slots.intent = "add_dish"
+            # 加菜轮同时提了新约束（如"家里没烤箱"）→ 不合规旧菜同样替换
+            replace_targets = session.violating_dishes()
+            for d in session.current_plan:
+                d.locked = d.recipe_id not in {x.recipe_id for x in replace_targets}
+            kept_ids = {d.recipe_id for d in session.current_plan if d.locked}
+            # 加菜 = 在现有菜数上追加：更新总菜数，防止下游"超量裁剪"把新菜切掉
+            add_n = 2 if re.search(r"[两2二][道个份]", message) else 1
+            session.dish_count = len(session.current_plan) + add_n
+
         yield emit({"type": "intent", "slots": {
             "intent": slots.intent, "meal": session.meal,
             "people": session.people, "time_limit_min": session.time_limit_min,
@@ -276,24 +299,6 @@ class MealAgent:
                 yield emit({"type": "delta", "text": tok})
             yield self._done(t0, first_ts, store)
             return
-
-        # 3.05) 换桌短语规则路由：意图分类器对"换一桌/全部换掉"易误判为 add_constraint，
-        #       走"零违规不变"分支导致跨轮去重失效 → 强制 reject_all 全新选菜
-        if session.current_plan and re.search(
-                r"换一(整)?桌|全部换掉|整桌换|重新来一(桌|份)|重换一", message):
-            slots.intent = "reject_all"
-
-        # 3.1) 加菜意图：在现有方案上追加（"再来点辣菜/加一道汤"），
-        #      已有菜品全部锁定保留，只选新增的 1-2 道
-        if (session.current_plan
-                and re.search(r"再来[一2两1]?[点道个份]|再添|再加[一1两2]?[道个份]|"
-                              r"加[一1两2]?[道个份](?!油|盐|糖|水)|添[一1两2]?[道个份]|多[加来][一1两2]?[道个份]", message)):
-            slots.intent = "add_dish"
-            # 加菜轮同时提了新约束（如"家里没烤箱"）→ 不合规旧菜同样替换
-            replace_targets = session.violating_dishes()
-            for d in session.current_plan:
-                d.locked = d.recipe_id not in {x.recipe_id for x in replace_targets}
-            kept_ids = {d.recipe_id for d in session.current_plan if d.locked}
 
         if slots.intent in ("add_constraint", "replace_dish") and session.current_plan:
             # 最小化修改：只替换违规/被点名/与本轮新需求冲突的菜品，其余锁定

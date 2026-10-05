@@ -44,7 +44,7 @@
           <h4>📋 本餐方案 · 忌口：{{ (it.plan.taboos || []).join('、') || '无' }}</h4>
           <div class="dishes">
             <div class="dish" v-for="d in sortDishes(it.plan.dishes)" :key="d.id"
-                 :class="{ link: d.detail }" @click="openDish(d)">
+                 :class="[{ link: d.detail }, roleClass(d.role)]" @click="openDish(d)">
               <div class="name">{{ d.name }}<span v-if="d.kept" class="kept">沿用</span></div>
               <div class="reason">{{ d.reason || '推荐理由生成中…' }}</div>
             </div>
@@ -235,6 +235,14 @@ function sortDishes(ds: any[]) {
   if (!Array.isArray(ds)) return ds || []
   const isSoup = (d: any) => d.role === '汤' || /汤/.test(d.name || '')
   return [...ds.filter(isSoup), ...ds.filter((d) => !isSoup(d))]
+}
+
+/* 按角色分底色：汤黄 / 素绿 / 荤淡红，其余默认 */
+function roleClass(role: string) {
+  if (role === '汤') return 'soup'
+  if (['素菜', '豆制品', '蛋类'].includes(role)) return 'veg'
+  if (['荤菜', '主菜'].includes(role)) return 'meat'
+  return ''
 }
 
 /* 选菜 LLM 偶发漏写理由：其他菜先显示，空理由菜异步重试生成 */
@@ -506,6 +514,9 @@ main { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: 
 .plan-card h4 { font-size: 13px; color: var(--primary); margin-bottom: 10px }
 .dishes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px }
 .dish { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: #fbfcfd }
+.dish.soup { background: #fff8e1; border-color: #f0e0a8 }
+.dish.veg { background: #eef7ee; border-color: #c9e6ca }
+.dish.meat { background: #fdeeed; border-color: #f2cdc9 }
 .dish .name { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap }
 .dish .kept { font-size: 11px; background: #eef4ff; color: #3f6ac6; padding: 1px 8px; border-radius: 10px }
 .dish .reason { font-size: 12.5px; color: #4a5361; margin-top: 5px; line-height: 1.6 }

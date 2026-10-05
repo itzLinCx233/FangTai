@@ -381,9 +381,14 @@ function profileIncomplete(): boolean {
   return !!u && (!u.gender || !u.birthday)
 }
 
+function obDismissKey() {
+  return 'ft_ob_dismissed_' + (auth.user?.username || '')
+}
+
 function maybeShowOnboard() {
   if (!profileIncomplete()) return
-  if (sessionStorage.getItem('ft_ob_dismissed')) return
+  // 跳过按账号持久化（localStorage）：刷新/重开不再反复弹；仍可从个人中心补填
+  if (localStorage.getItem(obDismissKey())) return
   ob.value = { gender: auth.user!.gender || '', birthday: auth.user!.birthday || '',
                taboo: auth.user!.taboo ? auth.user!.taboo.split('、') : [],
                height_cm: auth.user!.height_cm || null, weight_kg: auth.user!.weight_kg || null }
@@ -391,7 +396,7 @@ function maybeShowOnboard() {
 }
 
 function skipOnboard() {
-  sessionStorage.setItem('ft_ob_dismissed', '1')
+  localStorage.setItem(obDismissKey(), '1')
   obShow.value = false
 }
 

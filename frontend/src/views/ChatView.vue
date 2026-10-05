@@ -525,15 +525,16 @@ main { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: 
 
 /* 菜品详情弹窗（近正方形大窗：菜名/配料/做法）；.modal.dish-modal 提高特异性压过 .modal{width:440px} */
 .modal.dish-modal { width: min(560px, 92vw); height: min(78vh, 800px); display: flex; flex-direction: column; position: relative; overflow: hidden }
-.dm-close { position: absolute; top: 10px; right: 14px; z-index: 3; font-size: 22px }
+.dm-close { position: absolute; top: 8px; right: 12px; z-index: 3; font-size: 30px; width: 40px; height: 40px; line-height: 40px; border-radius: 50%; transition: background .15s }
+.dm-close:hover { background: #f0f2f5 }
 .dm-body { flex: 1; overflow-y: auto; padding: 24px 26px }
-.dm-name { font-size: 18px; font-weight: 700; color: var(--text); padding-right: 26px }
+.dm-name { font-size: 22px; font-weight: 700; color: var(--text); padding-right: 40px }
 .dm-hr { border: none; border-top: 1px solid var(--border); margin: 14px 0 }
-.dm-sub { font-size: 14px; color: var(--primary); margin-bottom: 8px }
+.dm-sub { font-size: 17px; color: var(--primary); margin-bottom: 10px }
 .dm-ings { list-style: none; display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px 18px; margin: 0; padding: 0 }
-.dm-ings li { font-size: 13px; color: #4a5361; line-height: 1.7 }
+.dm-ings li { font-size: 15.5px; color: #4a5361; line-height: 1.8 }
 .dm-steps { margin: 0; padding-left: 20px }
-.dm-steps li { font-size: 13px; color: #4a5361; line-height: 1.8; margin-bottom: 6px }
+.dm-steps li { font-size: 15.5px; color: #4a5361; line-height: 1.9; margin-bottom: 8px }
 footer { background: var(--card); border-top: 1px solid var(--border); padding: 14px 24px }
 .quick { display: flex; gap: 8px; max-width: 860px; margin: 0 auto 8px; flex-wrap: wrap }
 .quick button { font-size: 12px; padding: 5px 12px; border: 1px solid var(--border); background: #fff; border-radius: 14px; cursor: pointer; color: #4a5361 }

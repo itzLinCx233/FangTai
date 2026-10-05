@@ -53,6 +53,7 @@ class TurnSlots:
     keywords: list[str] = field(default_factory=list)     # 主题关键词（面/鱼/清淡...）
     ambiguous: bool = False                               # 需主动澄清
     clarify_question: str = ""
+    conflict: str = ""                                    # 需求矛盾描述（空串=无矛盾）
 
 
 # 口味正/反向词（"别做辣的"→banned 辣；"想吃辣"→taste 辣）
@@ -143,12 +144,14 @@ async def extract_slots(message: str, history_summary: str, llm,
  "dish_count":数字或null, "soup_needed":true/false/null,
  "banned_add":["新增忌口的口味或食材"],"taste_add":["想要的口味"],
  "keywords":["主题关键词如 面/鱼/减脂餐"],"ambiguous":true/false,
+ "conflict":"需求矛盾的一句话描述（如'既想吃辣又要求忌辣'），无矛盾则为空串",
  "clarify_question":"ambiguous时给出一句澄清问话，否则空串"}
 规则：
 - intent 判定参考对话历史摘要：" + (history_summary or "无") + "
 - "替换某道菜"=replace_dish；"整个方案都不要"=reject_all；"多个人聚餐/宴请"=banquet
 - 在上一轮方案上追加限制（含多人口味冲突/矛盾需求）=add_constraint；全新需求=new_request
 - 用户需求模糊（如"有仪式感""清爽"但无具体方向）时 ambiguous=true 并构造澄清问题
+- 消息内部自相矛盾（"想吃辣但别放辣"）或与本轮既有忌口冲突时 conflict 非空
 - banned_add 只放用户明确不想要的（"别辣"→["辣"]），不要臆测"""
     try:
         import json as _json
@@ -175,6 +178,7 @@ async def extract_slots(message: str, history_summary: str, llm,
                 keywords=list(set(base.keywords + (data.get("keywords") or []))),
                 ambiguous=bool(data.get("ambiguous")),
                 clarify_question=data.get("clarify_question") or "",
+                conflict=data.get("conflict") or "",
             )
             return s
     except Exception as e:
@@ -183,6 +187,24 @@ async def extract_slots(message: str, history_summary: str, llm,
 
 
 # ---------------------------------------------------------------- 会话状态
+def detect_conflicts(slots: TurnSlots, constraints: ProfileConstraints) -> str:
+    """规则级矛盾检测：返回冲突描述，无矛盾返回空串。
+
+    覆盖：本轮消息内自相矛盾（"想吃辣但别放辣"）、与既有会话/资料忌口冲突
+    （此前忌辣又想吃辣）。跨轮的正向口味切换（上轮辣、这轮清淡）不算矛盾，
+    由口味多值并存机制兼顾。
+    """
+    banned = set(constraints.extra_banned)
+    for t in slots.taste_add:
+        canon = TASTE_PREF_MAP.get(t, t)
+        if canon and canon in banned:
+            return f"此前已要求不吃/忌口「{canon}」，本轮又想吃「{canon}」"
+    for t in slots.taste_add:
+        if t in slots.banned_add:
+            return f"同一句话里既想要「{t}」又不要「{t}」"
+    return ""
+
+
 @dataclass
 class DishPlanItem:
     recipe_id: int
@@ -243,10 +265,13 @@ class DialogSession:
         if slots.banned_add:
             self.constraints.add_banned([b for b in slots.banned_add if b])
         if slots.taste_add:
+            # 口味多值并存（多人口味不同/前后口味切换都保留），顿号分隔
+            have = (self.constraints.taste_pref or "").split("、")
             for t in slots.taste_add:
                 canon = TASTE_PREF_MAP.get(t, t)
-                if canon and canon not in (self.constraints.taste_pref or ""):
-                    self.constraints.taste_pref = canon
+                if canon and canon not in have:
+                    self.constraints.taste_pref = "、".join(
+                        [x for x in have if x] + [canon])
                     break
 
     def label_filter(self) -> dict[str, list[str]]:

@@ -144,6 +144,34 @@ def test_meal_conflict_filter():
     print("test_meal_conflict_filter ✓")
 
 
+def test_conflict_and_taste():
+    # 矛盾检测：消息内自相矛盾
+    slots = dlg.rule_slots("想吃辣的但是别放辣")
+    assert slots.taste_add and slots.banned_add
+    c = dlg.ProfileConstraints()
+    assert dlg.detect_conflicts(slots, c)
+    # 跨轮矛盾：此前忌辣，本轮想吃辣
+    c.add_banned(["辣"])
+    slots2 = dlg.TurnSlots(taste_add=["辣"])
+    assert "辣" in dlg.detect_conflicts(slots2, c)
+    # 正向口味切换不算矛盾
+    slots3 = dlg.TurnSlots(taste_add=["清淡"])
+    assert not dlg.detect_conflicts(slots3, c)
+    # 口味多值并存：先辣后清淡，两个都保留
+    sess = dlg.DialogSession()
+    sess.apply_slots(dlg.TurnSlots(taste_add=["辣"]))
+    sess.apply_slots(dlg.TurnSlots(taste_add=["清淡"]))
+    assert "辣" in (sess.constraints.taste_pref or "") and "清淡" in (sess.constraints.taste_pref or "")
+    # 多人合并：不同人口味都保留（顿号多值）
+    c1 = dlg.ProfileConstraints()
+    c1.taste_pref = "辣"
+    c2 = dlg.ProfileConstraints()
+    c2.taste_pref = "清淡"
+    merged = merge_constraints([c1, c2])
+    assert "辣" in (merged.taste_pref or "") and "清淡" in (merged.taste_pref or "")
+    print("test_conflict_and_taste ✓")
+
+
 if __name__ == "__main__":
     test_recipe_store()
     test_constraint_engine()
@@ -152,4 +180,5 @@ if __name__ == "__main__":
     test_dialog_rules()
     test_estimate_minutes()
     test_meal_conflict_filter()
+    test_conflict_and_taste()
     print("\n全部通过 ✓")

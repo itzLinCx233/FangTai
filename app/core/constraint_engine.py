@@ -291,16 +291,24 @@ class ProfileConstraints:
 
 
 def merge_constraints(list_of: list[ProfileConstraints]) -> ProfileConstraints:
-    """多人场景：合并为全体约束的交集（任何人的违禁都对整桌生效）。"""
+    """多人场景：合并为全体约束的交集（任何人的违禁都对整桌生效）。
+
+    口味不做交集而是多值并存（"辣、清淡"）：不同人的口味偏好都应被照顾，
+    由选菜环节做整桌分配（辣菜与清淡菜都安排）。
+    """
     merged = ProfileConstraints(profile={})
-    allergens, taboos, needs, banned = set(), set(), [], set()
+    allergens, taboos, needs, banned, tastes = set(), set(), [], set(), []
     for c in list_of:
         allergens.update(c.allergens)
         taboos.update(c.taboo_keys)
         banned.update(c.extra_banned)
         needs += [n for n in c.health_needs if n not in needs]
+        for t in (c.taste_pref or "").split("、"):
+            if t and t not in tastes:
+                tastes.append(t)
     merged.allergens = sorted(allergens)
     merged.taboo_keys = sorted(taboos)
     merged.extra_banned = sorted(banned)
     merged.health_needs = needs[:6]
+    merged.taste_pref = "、".join(tastes[:3]) or None
     return merged

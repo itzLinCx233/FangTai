@@ -62,7 +62,7 @@ def candidate_pool(session: dlg.DialogSession, query: str, need: int = 24,
     for need_name in session.constraints.health_needs:
         boost += HEALTH_NEED_KEYWORDS.get(need_name, [])
     if session.constraints.taste_pref:
-        boost.append(session.constraints.taste_pref)
+        boost.extend(t for t in session.constraints.taste_pref.split("、") if t)
     results = get_retriever().search(
         query, ok_ids=ok_ids, label_filter=label_filter,
         keyword_boost=boost[:12], topk=need,
@@ -125,6 +125,11 @@ async def llm_select(
     task_lines = [f"任务：为{session.meal or '一餐'}（{session.people}人）选 {dish_count} 道菜"]
     if soup_needed:
         task_lines.append("其中应包含 1 道汤")
+    tastes = [t for t in (session.constraints.taste_pref or "").split("、") if t]
+    if len(tastes) > 1:
+        task_lines.append(
+            f"口味兼顾：用餐人中存在 {'与'.join(tastes)} 的不同偏好，"
+            "两类口味的菜都要安排，理由里点明各照顾谁")
     if avoid_names:
         mode_txt = "已从候选剔除，不得推荐" if avoid_hard else "排在候选末尾，除非用户本轮点名否则勿选"
         task_lines.append(f"重复度控制：{avoid_names} 此前已推荐过（{mode_txt}）")
@@ -266,21 +271,25 @@ class MealAgent:
             "people": session.people, "time_limit_min": session.time_limit_min,
         }})
 
-        # 2) 澄清分支：仅当无档案约束且方向确实不明时主动确认（评分③）
+        # 2) 矛盾需求 / 模糊需求 → 主动澄清（评分③交互自然度）
         has_profile_constraints = bool(
             session.profile_ids and (
                 session.constraints.allergens or session.constraints.taboo_keys
                 or session.constraints.health_needs or session.constraints.taste_pref)
         ) or bool(session.constraints.extra_banned)  # 用户资料忌口/会话忌口同样构成约束方向
+        conflict_txt = slots.conflict or dlg.detect_conflicts(slots, session.constraints)
+        if conflict_txt:
+            session.add_history("user", message)
+            q = (f"您提的需求里有点矛盾：{conflict_txt}。"
+                 "想和您确认下以哪个为准？也可以折中处理（比如微辣、少放辣）～")
+            async for ev in self._clarify_stream(session, q, emit, t0, first_ts, store):
+                yield ev
+            return
         if slots.ambiguous and not has_profile_constraints and not session.current_plan:
             session.add_history("user", message)
             q = slots.clarify_question or "方便说说您的偏好吗？比如想吃辣的还是清淡的、几个人吃？"
-            session.add_history("assistant", q)
-            yield emit({"type": "clarify", "question": q})
-            for tok in [q[i:i + 6] for i in range(0, len(q), 6)]:
-                yield {"type": "delta", "text": tok}
-                await asyncio.sleep(0.01)
-            yield self._done(t0, first_ts, store)
+            async for ev in self._clarify_stream(session, q, emit, t0, first_ts, store):
+                yield ev
             return
 
         # 3) 分支处理 → 统一得到 (plan_items, kept_ids, context_for_llm)
@@ -449,6 +458,16 @@ class MealAgent:
         session.add_history("assistant", "".join(reply_parts)[:600])
         yield self._done(t0, first_ts, store, plan=plan_payload)
 
+    async def _clarify_stream(self, session: dlg.DialogSession, q: str, emit,
+                              t0: float, first_ts: list[float], store):
+        """澄清回合：下发 clarify 事件并流式回显问题。"""
+        session.add_history("assistant", q)
+        yield emit({"type": "clarify", "question": q})
+        for tok in [q[i:i + 6] for i in range(0, len(q), 6)]:
+            yield {"type": "delta", "text": tok}
+            await asyncio.sleep(0.01)
+        yield self._done(t0, first_ts, store)
+
     # ---------------------------------------------------------------- 提示词
     def _explanation_prompt(
         self, session: dlg.DialogSession, message: str, balance: dict,
@@ -472,6 +491,10 @@ class MealAgent:
             replaced_note = "本轮替换掉的菜：" + "、".join(d.name for d in replaced) + "（因新约束不满足，其余菜品保持不变=最小化修改）"
         kept_items = [d for d in session.current_plan if d.locked]
         nut = balance["intake"]
+        tastes = [t for t in (session.constraints.taste_pref or "").split("、") if t]
+        taste_note = (
+            f"口味说明：需同时照顾「{'」「'.join(tastes)}」的不同偏好，"
+            "请在对应菜品的理由中点明各照顾谁" if len(tastes) > 1 else "")
         rules = [
             "1. 只能提及方案中列出的菜品，严禁编造菜名或食材",
             "2. 每道菜一句话理由：结合用餐人档案（健康需求/忌口/口味/人数/餐次）说明为什么选它，"
@@ -490,6 +513,7 @@ class MealAgent:
         user_prompt = "\n".join(filter(None, [
             "用餐人档案：\n" + "\n".join(profile_lines) if profile_lines else "",
             f"硬约束（必须全部满足，方案已通过校验）：{session.constraints.summary()}",
+            taste_note,
             f"本轮用户需求：{message}",
             replaced_note,
             f"最终方案（{session.people}人{session.meal or ''}）：\n" + "\n".join(dish_lines),

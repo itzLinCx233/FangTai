@@ -9,7 +9,7 @@
 - `app/api/routes.py` — 核心推荐 REST/SSE 路由（`/api/*`），会话存于进程内 `_sessions` 字典；鉴权**可选**（匿名评测调用不受影响）
 - `app/api/auth_routes.py` / `admin_routes.py` — 注册/登录/个人资料/历史会话、管理后台（用户 CRUD/统计）；需 MySQL，无 DB 时返回 503
 - `app/db.py` — SQLAlchemy 2.0 数据层（User/会话/消息表），`MYSQL_ENABLED=false` 或连接失败进入无 DB 模式（核心端点不受影响）；schema 变更走 `alembic/`
-- `app/core/` — 核心逻辑：`agent.py`（编排）、`constraint_engine.py`、`retriever.py`（BM25+向量混合检索）、`recipe_store.py`、`nutrition.py`、`planner.py`、`dialog.py`、`llm.py`、`profiles.py`、`security.py`（密码哈希+Bearer token）
+- `app/core/` — 核心逻辑：`agent.py`（编排）、`constraint_engine.py`、`retriever.py`（BM25+向量混合检索）、`recipe_store.py`、`nutrition.py`、`planner.py`、`dialog.py`、`llm.py`、`runtime_settings.py`（LLM 运行时配置，管理后台热切换）、`profiles.py`、`security.py`（密码哈希+Bearer token）
 - `frontend/` — Vue3 + Vite + TS + Element Plus + Pinia；`dist/` 为构建产物（由后端托管）
 - `app/web/` — 旧版单文件静态页（回退用，勿再新增功能）
 - `data/` — 运行数据副本；`资料/` — 赛题细则（docx）与原始数据（只读，勿改）
@@ -42,6 +42,7 @@ cd frontend && npm run build                      # 前端构建（build-fast �
 - SSE 事件协议：`intent / plan / delta / clarify / done`，`plan` 事件携带结构化方案供评测机判，改字段名会破坏 `scripts/eval.py` 与 `score_test.py`。
 - **零幻觉**：推荐菜名必须来自菜谱库（`store.exists()` 校验）；**零违反**：过敏/忌口经约束引擎双遍校验。这两条是赛题硬性指标，不得放宽。
 - 核心模块均为模块级单例工厂：`get_store() / get_retriever() / get_llm() / get_agent()`，直接复用，勿自建实例。
+- 管理后台"模型设置"可热切换 LLM（base_url/api_key/模型/思考模式/温度）：读经 `runtime_settings`（env 为默认，`app_settings` 表持久化），改后 `LLMClient.reload()` 重建客户端并清思考格式探测缓存；api_key 对外一律打码回显。
 - 用户系统边界：登录用户资料（忌口/绑定档案）只**并入**会话约束，不替代请求参数；`/api/chat` 必须保持匿名可用（评测机不登录）。角色为 admin 的用户禁止删除（前后端双重拦截，勿放开）。
 - `app/db.py` 对外函数名与签名保持稳定（auth/admin/routes 依赖）；schema 改动一律走 Alembic 迁移，勿手写 ALTER。
 

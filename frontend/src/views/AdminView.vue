@@ -22,6 +22,7 @@
           <el-menu-item index="dash">📊 仪表盘</el-menu-item>
           <el-menu-item index="users">👥 用户管理</el-menu-item>
           <el-menu-item index="sessions">🕘 会话记录</el-menu-item>
+          <el-menu-item index="settings">⚙️ 模型设置</el-menu-item>
           <el-menu-item index="chat">💬 返回聊天页</el-menu-item>
         </el-menu>
         <div class="foot">登录身份：{{ auth.user?.nickname || auth.user?.username }}<br>
@@ -142,6 +143,46 @@
                            @current-change="(p: number) => { sPage = p; loadSessions() }" />
           </el-card>
         </section>
+        <!-- 模型设置 -->
+        <section v-show="view === 'settings'">
+          <el-card shadow="never" style="max-width: 660px">
+            <el-form label-width="110px" label-position="left">
+              <el-form-item label="接口地址">
+                <el-input v-model="lc.base_url" placeholder="https://open.bigmodel.cn/api/paas/v4" />
+                <div class="hint">OpenAI 兼容端点，换服务商即改这里（智谱 / DeepSeek / vLLM / Ollama…）</div>
+              </el-form-item>
+              <el-form-item label="API Key">
+                <el-input v-model="lc.api_key" type="password" show-password placeholder="输入新 Key 即覆盖" />
+                <div class="hint">已保存：<span class="mono">{{ lcApiKeyMasked || '（空）' }}</span>，留空表示不修改</div>
+              </el-form-item>
+              <el-form-item label="主模型">
+                <el-input v-model="lc.model" placeholder="glm-5.3" />
+              </el-form-item>
+              <el-form-item label="快速模型">
+                <el-input v-model="lc.fast_model" placeholder="留空 = 与主模型相同（意图识别/选菜等轻量调用）" />
+              </el-form-item>
+              <el-form-item label="思考模式">
+                <el-select v-model="lc.thinking" style="width: 100%">
+                  <el-option label="disabled — 关闭思考（性能优先）" value="disabled" />
+                  <el-option label="low — 低强度思考（均衡）" value="low" />
+                  <el-option label="high — 高强度思考（质量优先，耗时明显增加）" value="high" />
+                  <el-option label="max — 最高强度" value="max" />
+                  <el-option label="auto — 交给服务端默认" value="auto" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="温度">
+                <el-slider v-model="lc.temperature" :min="0" :max="1.5" :step="0.05" show-input />
+              </el-form-item>
+            </el-form>
+            <el-alert v-if="lc && lc.persisted === false"
+                      title="当前为无 DB 模式：修改仅本进程生效，重启后回落环境变量默认值"
+                      type="warning" :closable="false" style="margin-bottom: 12px" />
+            <div class="lc-actions">
+              <el-button :loading="lcTesting" @click="testLLM">测试连接</el-button>
+              <el-button type="primary" :loading="lcSaving" @click="saveLLM">保存并生效</el-button>
+            </div>
+          </el-card>
+        </section>
       </el-main>
     </el-container>
 
@@ -203,8 +244,9 @@ const gUser = ref('admin')
 const gPass = ref('')
 const gErr = ref('')
 
-const view = ref<'dash' | 'users' | 'sessions'>('dash')
-const viewTitle = computed(() => ({ dash: '仪表盘', users: '用户管理', sessions: '会话记录' }[view.value]))
+const view = ref<'dash' | 'users' | 'sessions' | 'settings'>('dash')
+const viewTitle = computed(() => (
+  { dash: '仪表盘', users: '用户管理', sessions: '会话记录', settings: '模型设置' }[view.value]))
 
 const statCards = ref<{ label: string; num: number; bg: string; color: string }[]>([])
 const recentUsers = ref<any[]>([])
@@ -230,6 +272,7 @@ function doLogout() {
 function onNav(key: string) {
   if (key === 'chat') { router.push('/'); return }
   view.value = key as any
+  if (key === 'settings' && !lcLoaded.value) { lcLoaded.value = true; loadLLM() }
 }
 
 async function loadDash() {
@@ -331,6 +374,55 @@ async function viewSess(sid: string) {
   cmShow.value = true
 }
 
+/* 模型设置（运行时热切换 LLM 配置） */
+const lcLoaded = ref(false)
+const lc = ref<any>({ base_url: '', api_key: '', model: '', fast_model: '', thinking: 'high', temperature: 0.6, persisted: true })
+const lcApiKeyMasked = ref('')
+const lcSaving = ref(false)
+const lcTesting = ref(false)
+
+async function loadLLM() {
+  try {
+    const d = await api<any>('/api/admin/llm-config')
+    lcApiKeyMasked.value = d.api_key || ''
+    lc.value = {
+      base_url: d.base_url || '', api_key: '', model: d.model || '',
+      fast_model: d.fast_model || '', thinking: d.thinking || 'high',
+      temperature: Number(d.temperature) || 0.6, persisted: !!d.persisted,
+    }
+  } catch (e: any) { ElMessage.error(e.message) }
+}
+
+async function saveLLM() {
+  lcSaving.value = true
+  try {
+    const body: any = {
+      base_url: lc.value.base_url.trim(),
+      model: lc.value.model.trim(),
+      fast_model: lc.value.fast_model.trim(), // 空串 = 回退主模型
+      thinking: lc.value.thinking,
+      temperature: lc.value.temperature,
+    }
+    if (lc.value.api_key.trim()) body.api_key = lc.value.api_key.trim()
+    const d = await api<any>('/api/admin/llm-config', { method: 'PUT', body: JSON.stringify(body) })
+    lcApiKeyMasked.value = d.api_key || ''
+    lc.value.api_key = ''
+    lc.value.persisted = !!d.persisted
+    ElMessage.success('模型配置已保存并即时生效')
+  } catch (e: any) { ElMessage.error(e.message) }
+  finally { lcSaving.value = false }
+}
+
+async function testLLM() {
+  lcTesting.value = true
+  try {
+    const d = await api<any>('/api/admin/llm-config/test', { method: 'POST' })
+    if (d.ok) ElMessage.success(`连接正常：${d.model}，延迟 ${d.latency_ms}ms`)
+    else ElMessage.error(`连接失败：${d.error}（${d.latency_ms}ms）`)
+  } catch (e: any) { ElMessage.error(e.message) }
+  finally { lcTesting.value = false }
+}
+
 onMounted(async () => {
   await auth.refresh()
   if (auth.isAdmin) { enter(); return }
@@ -368,4 +460,6 @@ onMounted(async () => {
 .cv-msg { margin-bottom: 10px; font-size: 13px; line-height: 1.6 }
 .cv-msg b { color: var(--primary) }
 .muted { color: var(--muted); font-size: 13px }
+.hint { font-size: 12px; color: var(--muted); margin-top: 4px; width: 100% }
+.lc-actions { display: flex; gap: 10px; align-items: center; margin-top: 4px }
 </style>

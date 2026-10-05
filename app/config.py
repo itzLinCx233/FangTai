@@ -1,4 +1,8 @@
-"""全局配置：全部来自环境变量（docker-compose 注入），不使用 .env 文件。"""
+"""全局配置：全部来自环境变量（docker-compose 注入），不使用 .env 文件。
+
+LLM 一节为默认值；管理后台可在运行时覆盖（app/core/runtime_settings.py，
+持久化到 MySQL app_settings 表，无 DB 时仅进程内生效）。
+"""
 import os
 from pathlib import Path
 

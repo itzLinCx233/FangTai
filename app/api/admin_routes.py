@@ -1,5 +1,7 @@
-"""管理员后台 API（需 admin 角色）：统计 / 用户增删改查 / 会话记录。"""
+"""管理员后台 API（需 admin 角色）：统计 / 用户增删改查 / 会话记录 / LLM 运行时配置。"""
 from __future__ import annotations
+
+import time
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -121,3 +123,63 @@ async def session_messages(sid: str, admin: dict = Depends(security.require_admi
     if not row:
         raise HTTPException(404, "会话不存在")
     return {"session_id": sid, "items": db.get_session_messages(sid)}
+
+
+# ---------------------------------------------------------------- LLM 运行时配置
+def _mask_key(key: str) -> str:
+    if not key:
+        return ""
+    if len(key) <= 8:
+        return key[:2] + "****"
+    return f"{key[:5]}****{key[-4:]}"
+
+
+def _config_view(cfg: dict) -> dict:
+    """对外视图：api_key 打码 + 是否已持久化。"""
+    return {**cfg, "api_key": _mask_key(cfg.get("api_key", "")),
+            "persisted": db.db_ready()}
+
+
+@router.get("/llm-config")
+async def get_llm_config(admin: dict = Depends(security.require_admin)):
+    from app.core import runtime_settings
+    return _config_view(runtime_settings.get())
+
+
+class LLMConfigUpdate(BaseModel):
+    base_url: str | None = Field(default=None, max_length=200)
+    api_key: str | None = Field(default=None, max_length=200)
+    model: str | None = Field(default=None, max_length=100)
+    fast_model: str | None = Field(default=None, max_length=100)  # 空串=回退主模型
+    thinking: str | None = Field(default=None,
+                                 pattern=r"^(disabled|enabled|low|high|max|auto)$")
+    temperature: float | None = Field(default=None, ge=0, le=2)
+
+
+@router.put("/llm-config")
+async def update_llm_config(req: LLMConfigUpdate, admin: dict = Depends(security.require_admin)):
+    from app.core import runtime_settings
+    fields = {k: v for k, v in req.model_dump().items() if v is not None}
+    # 前端把打码后的 key 原样传回 = 未修改，跳过
+    if fields.get("api_key") and "****" in fields["api_key"]:
+        fields.pop("api_key")
+    if not fields:
+        raise HTTPException(400, "没有可更新的字段")
+    cfg = runtime_settings.update(fields)
+    return _config_view(cfg)
+
+
+@router.post("/llm-config/test")
+async def test_llm_config(admin: dict = Depends(security.require_admin)):
+    """用当前生效配置发一条 8-token 测试请求，返回连通性与延迟。"""
+    from app.core.llm import get_llm
+    llm = get_llm()
+    t0 = time.perf_counter()
+    try:
+        out = await llm.chat([llm.system("只输出两个字：正常")], max_tokens=8,
+                             thinking="disabled")
+        return {"ok": True, "latency_ms": round((time.perf_counter() - t0) * 1000),
+                "model": llm.model, "reply": out.strip()[:20]}
+    except Exception as e:
+        return {"ok": False, "latency_ms": round((time.perf_counter() - t0) * 1000),
+                "model": llm.model, "error": str(e)[:200]}

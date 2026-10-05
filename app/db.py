@@ -4,7 +4,8 @@
   db_ready / db_error / init_db / query / query_one / execute / execute_returning_id
   user_public / create_user / get_user_by_id / get_user_by_name / authenticate /
   update_user / delete_user / list_users / save_session / save_message /
-  list_user_sessions / get_session_messages / admin_stats / admin_recent_sessions
+  list_user_sessions / get_session_messages / admin_stats / admin_recent_sessions /
+  get_setting / set_setting
 
 - MYSQL_ENABLED=false 或连接失败时进入"无DB模式"：用户系统端点 503，评测核心端点不受影响
 - schema 演进用 Alembic：`alembic revision --autogenerate` + `alembic upgrade head`；
@@ -77,6 +78,15 @@ class ChatMessage(Base):
     content: Mapped[str] = mapped_column(Text().with_variant(MEDIUMTEXT(), "mysql"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
     __table_args__ = (Index("idx_session", "session_id"),)
+
+
+class AppSetting(Base):
+    """通用 KV 设置表（运行时可变配置，如管理后台切换的 LLM 参数）。"""
+    __tablename__ = "app_settings"
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[str] = mapped_column(Text().with_variant(MEDIUMTEXT(), "mysql"), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False,
+                                                 server_default=func.now(), onupdate=func.now())
 
 
 # ---------------------------------------------------------------- 引擎
@@ -366,3 +376,31 @@ def admin_recent_sessions(search: str = "", page: int = 1, size: int = 10):
                           "created_at": str(cs.created_at), "username": username,
                           "nickname": nickname, "msg_count": msg_count or 0})
         return items, total
+
+
+# ---------------------------------------------------------------- 设置 KV DAO
+# 无 DB 模式的进程内兜底存储（重启即失，仅保证接口可用）
+_MEM_SETTINGS: dict[str, str] = {}
+
+
+def get_setting(key: str) -> Optional[str]:
+    """读取设置项；无 DB 模式读进程内兜底。"""
+    if not _db_ready:
+        return _MEM_SETTINGS.get(key)
+    with _session() as s:
+        row = s.get(AppSetting, key)
+        return row.value if row else None
+
+
+def set_setting(key: str, value: str) -> None:
+    """写入/更新设置项（upsert）；无 DB 模式写进程内兜底。"""
+    if not _db_ready:
+        _MEM_SETTINGS[key] = value
+        return
+    with _session() as s:
+        row = s.get(AppSetting, key)
+        if row:
+            row.value = value
+        else:
+            s.add(AppSetting(key=key, value=value))
+        s.commit()

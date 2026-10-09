@@ -176,14 +176,10 @@ async def llm_select(
                 seen.add(rid)
         if picked:
             return picked[: dish_count + 2]
+        raise RuntimeError("LLM 选菜返回空结果（无有效菜品）")
     except Exception as e:
-        print(f"[agent] LLM 选菜异常，回退规则组合: {e}")
-    # 规则回退
-    combo = planner.build_combo(
-        pool, people=session.people, dish_count=dish_count,
-        soup_needed=soup_needed, meal=session.meal,
-    )
-    return [(d, "荤素冷热搭配均衡，覆盖本餐营养需求") for d in combo.dishes[: dish_count + 2]]
+        # 显式失败：不做规则组合降级，让问题在评测/前端直接暴露
+        raise RuntimeError(f"LLM 选菜失败: {e}") from e
 
 
 def finalize_plan(

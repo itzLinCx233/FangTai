@@ -139,8 +139,11 @@ async def recommend(req: RecommendRequest, authorization: str | None = Header(No
     agent = get_agent()
     events = []
     t0 = time.perf_counter()
-    async for ev in agent.stream_chat(sess, req.message):
-        events.append(ev)
+    try:
+        async for ev in agent.stream_chat(sess, req.message):
+            events.append(ev)
+    except Exception as e:
+        raise HTTPException(502, f"推荐失败: {e}")
     if user:
         try:
             import app.db as db
